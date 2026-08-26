@@ -1,0 +1,5 @@
+﻿PID,Name,AT,BT,Priority,IO_After,IO_Duration
+1,P1,0,8,3,2,3
+2,P2,0,6,1,2,2
+3,P3,1,4,2,1,2
+4,P4,2,5,4,0,0
