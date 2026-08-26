@@ -95,7 +95,7 @@ export default function ProcessTable({
           } else if (col === 'at' || col === 'arrival' || col === 'arrival time' || col === 'arrivaltime') {
             atIdx = idx;
             hasHeader = true;
-          } else if (col === 'bt' || col === 'burst' || col === 'burst time' || col === 'bursttime' || col === 'cpu burst') {
+          } else if (col === 'bt' || col === 'burst' || col === 'burst time' || col === 'bursttime' || col === 'cpu burst' || col === 'cpu (bt)' || col === 'cpu') {
             btIdx = idx;
             hasHeader = true;
           } else if (col === 'priority' || col === 'prio' || col === 'p') {
@@ -104,10 +104,23 @@ export default function ProcessTable({
           } else if (col === 'pid' || col === 'id' || col === '#') {
             pidIdx = idx;
             hasHeader = true;
-          } else if (col === 'io_after' || col === 'ioafter' || col === 'io after' || col === 'io') {
+          } else if (col === 'io_after' || col === 'ioafter' || col === 'io after') {
             ioAfterIdx = idx;
             hasHeader = true;
-          } else if (col === 'io_duration' || col === 'ioduration' || col === 'io duration' || col === 'wait' || col === 'i/o') {
+          } else if (
+            col === 'io_duration' ||
+            col === 'ioduration' ||
+            col === 'io duration' ||
+            col === 'io_burst' ||
+            col === 'ioburst' ||
+            col === 'io burst' ||
+            col === 'io_bt' ||
+            col === 'iobt' ||
+            col === 'io burst time' ||
+            col === 'io' ||
+            col === 'i/o' ||
+            col === 'wait'
+          ) {
             ioDurationIdx = idx;
             hasHeader = true;
           }
@@ -136,6 +149,9 @@ export default function ProcessTable({
             if (priorityIdx !== -1 && !isNaN(Number(cols[priorityIdx]))) priority = Math.max(0, Number(cols[priorityIdx]));
             if (ioAfterIdx !== -1 && !isNaN(Number(cols[ioAfterIdx]))) ioAfter = Math.max(0, Number(cols[ioAfterIdx]));
             if (ioDurationIdx !== -1 && !isNaN(Number(cols[ioDurationIdx]))) ioDuration = Math.max(0, Number(cols[ioDurationIdx]));
+            if (ioDuration > 0 && ioAfter === 0) {
+              ioAfter = Math.max(1, Math.floor(totalBurst / 2));
+            }
           } else {
             // Headerless format matching common CSV patterns
             if (cols.length >= 7) {
@@ -148,13 +164,14 @@ export default function ProcessTable({
               ioAfter = Math.max(0, Number(cols[5]) || 0);
               ioDuration = Math.max(0, Number(cols[6]) || 0);
             } else if (cols.length === 6) {
-              // Format: Name, AT, BT, Priority, IO_After, IO_Duration
-              name = cols[0] || `P${index + 1}`;
-              arrivalTime = Math.max(0, Number(cols[1]) || 0);
-              totalBurst = Math.max(1, Number(cols[2]) || 4);
-              priority = Math.max(0, Number(cols[3]) || 1);
-              ioAfter = Math.max(0, Number(cols[4]) || 0);
+              // Format: PID, Name, AT, BT, Priority, IO_Duration
+              pid = !isNaN(Number(cols[0])) ? Number(cols[0]) : index + 1;
+              name = cols[1] || `P${pid}`;
+              arrivalTime = Math.max(0, Number(cols[2]) || 0);
+              totalBurst = Math.max(1, Number(cols[3]) || 4);
+              priority = Math.max(0, Number(cols[4]) || 1);
               ioDuration = Math.max(0, Number(cols[5]) || 0);
+              ioAfter = ioDuration > 0 ? Math.max(1, Math.floor(totalBurst / 2)) : 0;
             } else if (cols.length === 5) {
               // Format: PID, Name, AT, BT, Priority
               pid = !isNaN(Number(cols[0])) ? Number(cols[0]) : index + 1;
