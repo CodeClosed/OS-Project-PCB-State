@@ -1,5 +1,10 @@
 # 🖥️ OS Process Lifecycle & CPU Scheduling Simulator
 
+[![Deploy to GitHub Pages](https://github.com/CodeClosed/OS-Project-PCB-State/actions/workflows/deploy.yml/badge.svg)](https://github.com/CodeClosed/OS-Project-PCB-State/actions/workflows/deploy.yml)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-2563eb?style=for-the-badge&logo=github)](https://codeclosed.github.io/OS-Project-PCB-State/)
+
+**Live Website:** 🌐 [https://codeclosed.github.io/OS-Project-PCB-State/](https://codeclosed.github.io/OS-Project-PCB-State/)
+
 An interactive, full-featured **Operating System Process Lifecycle & CPU Scheduling Simulator** built with **React**, **Vite**, and **Tailwind CSS**.
 
 Visualize discrete operating system states (5-State Machine), real-time Process Control Block (PCB) tracking, dynamic Execution Gantt Charts, time-travel execution stepping, and comprehensive scheduling performance metrics.
