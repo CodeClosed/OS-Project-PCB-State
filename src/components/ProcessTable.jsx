@@ -19,6 +19,7 @@ export default function ProcessTable({
   const [quickPriority, setQuickPriority] = useState(1);
   const [quickAT, setQuickAT] = useState(0);
   const [quickBurst, setQuickBurst] = useState(4);
+  const [quickIO, setQuickIO] = useState(0);
   const fileInputRef = useRef(null);
 
   const usesPriority = algorithm === 'PRIORITY_NP' || algorithm === 'PRIORITY_P';
@@ -35,6 +36,8 @@ export default function ProcessTable({
     const priority = quickPriority !== '' && !isNaN(Number(quickPriority)) ? Number(quickPriority) : 1;
     const arrivalTime = quickAT !== '' && !isNaN(Number(quickAT)) ? Number(quickAT) : 0;
     const totalBurst = quickBurst !== '' && !isNaN(Number(quickBurst)) && Number(quickBurst) >= 1 ? Number(quickBurst) : 4;
+    const ioDuration = quickIO !== '' && !isNaN(Number(quickIO)) ? Number(quickIO) : 0;
+    const ioAfter = ioDuration > 0 ? Math.max(1, Math.floor(totalBurst / 2)) : 0;
 
     if (onQuickAddProcess) {
       onQuickAddProcess({
@@ -42,6 +45,8 @@ export default function ProcessTable({
         priority,
         arrivalTime,
         totalBurst,
+        ioDuration,
+        ioAfter,
         memoryMB: 32,
       });
     }
@@ -334,6 +339,7 @@ export default function ProcessTable({
               </th>
               <th className="py-2.5 px-2.5 font-bold text-slate-700">AT</th>
               <th className="py-2.5 px-2.5 font-bold text-cyan-700">CPU BURST (BT)</th>
+              <th className="py-2.5 px-2.5 font-bold text-amber-700">I/O BURST (IO)</th>
               <th className="py-2.5 px-2.5 font-bold text-cyan-800">CT</th>
               <th className="py-2.5 px-2.5 font-bold text-rose-800">TAT</th>
               <th className="py-2.5 px-2.5 font-bold text-emerald-800">WT</th>
@@ -343,7 +349,7 @@ export default function ProcessTable({
           <tbody className="divide-y divide-slate-100">
             {processes.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-6 text-center text-slate-400 italic">
+                <td colSpan={11} className="py-6 text-center text-slate-400 italic">
                   Table is empty. Use the quick-add bar below to add processes.
                 </td>
               </tr>
@@ -464,6 +470,36 @@ export default function ProcessTable({
                       </div>
                     </td>
 
+                    {/* Editable I/O Burst Time (IO) */}
+                    <td className="py-2 px-2.5">
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        {p.state === 'WAITING' ? (
+                          <span className="px-1.5 py-0.5 rounded bg-amber-100 border border-amber-300 text-amber-800 font-bold text-[10px]" title="Currently waiting for I/O completion">
+                            ⏳ {p.ioRemaining || p.ioDuration}t left
+                          </span>
+                        ) : (
+                          <>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={p.ioDuration !== undefined ? p.ioDuration : 0}
+                              onChange={(e) => onUpdateProcess && onUpdateProcess(p.pid, 'ioDuration', e.target.value)}
+                              onBlur={(e) => onBlurProcess && onBlurProcess(p.pid, 'ioDuration', e.target.value)}
+                              onFocus={() => onSelectPid(p.pid)}
+                              className={`w-12 bg-white border rounded px-1 py-0.5 text-center font-bold text-xs focus:outline-none transition-colors shadow-2xs ${
+                                (Number(p.ioDuration) || 0) > 0
+                                  ? 'border-amber-300 text-amber-800 hover:border-amber-400 focus:border-amber-500'
+                                  : 'border-slate-200 text-slate-400 hover:border-slate-300 focus:border-blue-500'
+                              }`}
+                              title="I/O Burst duration in ticks (0 = pure CPU job, >0 = requests I/O and moves to WAITING state)"
+                            />
+                            <span className="text-amber-700 font-bold text-[11px]">t</span>
+                          </>
+                        )}
+                      </div>
+                    </td>
+
                     <td className="py-2 px-2.5 text-cyan-800 font-bold">{ct}</td>
                     <td className="py-2 px-2.5 text-rose-700 font-bold">{tat}</td>
                     <td className="py-2 px-2.5 text-emerald-700 font-bold">{wt}</td>
@@ -552,6 +588,19 @@ export default function ProcessTable({
             onChange={(e) => setQuickBurst(e.target.value === '' ? '' : e.target.value)}
             className="w-14 bg-white border border-slate-300 rounded px-1.5 py-1 text-slate-900 font-bold focus:outline-none focus:border-blue-500 text-center"
             title="Burst Time (ticks)"
+          />
+        </div>
+
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] text-amber-700 font-medium">IO:</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={quickIO}
+            onChange={(e) => setQuickIO(e.target.value === '' ? '' : e.target.value)}
+            className="w-12 bg-white border border-amber-300 rounded px-1.5 py-1 text-amber-900 font-bold focus:outline-none focus:border-amber-500 text-center"
+            title="I/O Burst duration (ticks, 0 = none)"
           />
         </div>
 

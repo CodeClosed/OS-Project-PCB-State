@@ -71,7 +71,18 @@ export default function PCBInspector({ process }) {
         </div>
 
         <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-          <span className="text-slate-500 block text-[10px] font-medium">Waiting Time (WT)</span>
+          <span className="text-slate-500 block text-[10px] font-medium">I/O Burst & State</span>
+          <span className={`font-bold ${process.ioDuration > 0 ? 'text-amber-700' : 'text-slate-500'}`}>
+            {process.ioDuration > 0
+              ? process.state === 'WAITING'
+                ? `⏳ ${process.ioRemaining || process.ioDuration}t left (WAITING)`
+                : `${process.ioDuration}t (Configured)`
+              : '0t (None)'}
+          </span>
+        </div>
+
+        <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 col-span-2">
+          <span className="text-slate-500 block text-[10px] font-medium">Ready Queue Waiting Time (WT)</span>
           <span className="font-bold text-slate-800">{process.waitingTime} ticks</span>
         </div>
 

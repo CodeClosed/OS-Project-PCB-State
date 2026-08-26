@@ -107,7 +107,8 @@ export default function FinalReportModal({ isOpen, onClose, processes, clockTick
                   <th className="py-2.5 px-3">PID</th>
                   <th className="py-2.5 px-3">PROCESS</th>
                   <th className="py-2.5 px-3">ARRIVAL (AT)</th>
-                  <th className="py-2.5 px-3">BURST (BT)</th>
+                  <th className="py-2.5 px-3">CPU (BT)</th>
+                  <th className="py-2.5 px-3 text-amber-700">I/O BURST</th>
                   <th className="py-2.5 px-3">PRIORITY</th>
                   <th className="py-2.5 px-3 text-cyan-800">COMPLETION (CT)</th>
                   <th className="py-2.5 px-3 text-rose-800">TURNAROUND (TAT)</th>
@@ -122,6 +123,7 @@ export default function FinalReportModal({ isOpen, onClose, processes, clockTick
                   const tat = p.turnaroundTime !== null ? `${p.turnaroundTime}t` : `${clockTick - p.arrivalTime}t*`;
                   const wt = `${p.waitingTime}t`;
                   const rt = p.responseTime !== null ? `${p.responseTime}t` : '—';
+                  const io = (p.ioDuration || 0) > 0 ? `${p.ioDuration}t` : '—';
 
                   return (
                     <tr key={p.pid} className="hover:bg-slate-50">
@@ -129,6 +131,7 @@ export default function FinalReportModal({ isOpen, onClose, processes, clockTick
                       <td className="py-2.5 px-3 font-bold text-slate-900">{p.name}</td>
                       <td className="py-2.5 px-3 text-slate-600">T+{p.arrivalTime}</td>
                       <td className="py-2.5 px-3 text-slate-600 font-medium">{p.totalBurst}t</td>
+                      <td className="py-2.5 px-3 text-amber-700 font-bold">{io}</td>
                       <td className="py-2.5 px-3 text-amber-700 font-bold">Lvl {p.priority}</td>
                       <td className="py-2.5 px-3 font-bold text-cyan-800">{ct}</td>
                       <td className="py-2.5 px-3 font-bold text-rose-700">{tat}</td>

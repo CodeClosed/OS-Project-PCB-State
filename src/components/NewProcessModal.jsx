@@ -7,6 +7,7 @@ export default function NewProcessModal({ isOpen, onClose, onCreateProcess, next
   const [priority, setPriority] = useState(1);
   const [arrivalTime, setArrivalTime] = useState(currentTick);
   const [burst, setBurst] = useState(6);
+  const [ioDuration, setIoDuration] = useState(0);
   const [memoryMB, setMemoryMB] = useState(32);
 
   // Update defaults when opened
@@ -14,6 +15,7 @@ export default function NewProcessModal({ isOpen, onClose, onCreateProcess, next
     if (isOpen) {
       setName(`P${nextPid} (Task)`);
       setArrivalTime(currentTick);
+      setIoDuration(0);
     }
   }, [isOpen, nextPid, currentTick]);
 
@@ -21,15 +23,19 @@ export default function NewProcessModal({ isOpen, onClose, onCreateProcess, next
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const totalBurst = Math.max(1, Number(burst));
+    const ioDur = Math.max(0, Number(ioDuration) || 0);
+    const ioAfter = ioDur > 0 ? Math.max(1, Math.floor(totalBurst / 2)) : 0;
+
     const newProc = createProcess({
       pid: nextPid,
       name: name.trim() || `P${nextPid}`,
       priority: Math.max(0, Number(priority)),
       arrivalTime: Math.max(0, Number(arrivalTime)),
-      totalBurst: Math.max(1, Number(burst)),
+      totalBurst,
       memoryMB: Math.max(1, Number(memoryMB)),
-      ioAfter: 0,
-      ioDuration: 0,
+      ioAfter,
+      ioDuration: ioDur,
     });
     onCreateProcess(newProc);
     onClose();
@@ -116,22 +122,41 @@ export default function NewProcessModal({ isOpen, onClose, onCreateProcess, next
             </div>
           </div>
 
-          {/* CPU Burst Time (1 to ∞) */}
-          <div>
-            <label className="text-slate-600 block mb-1 font-medium text-[11px]">
-              CPU Burst Time <span className="text-slate-400 font-normal">(BT: 1 to ∞ ticks)</span>
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={burst}
-                onChange={(e) => setBurst(e.target.value === '' ? '' : Number(e.target.value))}
-                required
-                className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-500 font-bold text-sm"
-              />
-              <span className="absolute right-2.5 top-2.5 text-[10px] text-slate-400 font-bold">ticks</span>
+          {/* CPU Burst & I/O Burst Times */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="text-slate-600 block mb-1 font-medium text-[11px]">
+                CPU Burst <span className="text-slate-400 font-normal">(BT: 1 to ∞)</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={burst}
+                  onChange={(e) => setBurst(e.target.value === '' ? '' : Number(e.target.value))}
+                  required
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:border-cyan-500 font-bold"
+                />
+                <span className="absolute right-2.5 top-2 text-[10px] text-slate-400 font-bold">ticks</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-slate-600 block mb-1 font-medium text-[11px]">
+                I/O Burst <span className="text-slate-400 font-normal">(IO: 0 to ∞)</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={ioDuration}
+                  onChange={(e) => setIoDuration(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:border-amber-500 font-bold"
+                />
+                <span className="absolute right-2.5 top-2 text-[10px] text-slate-400 font-bold">ticks</span>
+              </div>
             </div>
           </div>
 

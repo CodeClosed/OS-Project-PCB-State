@@ -142,20 +142,24 @@ export default function App() {
   const handleQuickAddProcess = (data) => {
     setProcesses((prev) => {
       const calcPid = prev.length > 0 ? Math.max(...prev.map((p) => Number(p.pid) || 0)) + 1 : 1;
+      const totalBurst = data.totalBurst !== undefined ? data.totalBurst : 4;
+      const ioDuration = data.ioDuration !== undefined ? data.ioDuration : 0;
+      const ioAfter = ioDuration > 0 ? Math.max(1, Math.floor(totalBurst / 2)) : 0;
+
       const newProc = createProcess({
         pid: calcPid,
         name: data.name || `P${calcPid}`,
         priority: data.priority !== undefined ? data.priority : 1,
         arrivalTime: data.arrivalTime !== undefined ? data.arrivalTime : 0,
-        totalBurst: data.totalBurst !== undefined ? data.totalBurst : 4,
+        totalBurst,
         memoryMB: data.memoryMB || 32,
-        ioAfter: 0,
-        ioDuration: 0,
+        ioAfter,
+        ioDuration,
       });
 
       setSelectedPid(calcPid);
       setEventLogs((logs) => [
-        `[T+${clockTick}] Added ${newProc.name} (AT: ${newProc.arrivalTime}, BT: ${newProc.totalBurst}t, Priority: ${newProc.priority})`,
+        `[T+${clockTick}] Added ${newProc.name} (AT: ${newProc.arrivalTime}, BT: ${newProc.totalBurst}t, IO: ${newProc.ioDuration}t, Priority: ${newProc.priority})`,
         ...logs,
       ].slice(0, 50));
 
@@ -203,7 +207,7 @@ export default function App() {
     }
   };
 
-  // Inline update process fields (Priority, AT, BT, Name) directly from table
+  // Inline update process fields (Priority, AT, BT, IO Burst, Name) directly from table
   const handleUpdateProcess = (pid, field, rawValue) => {
     setProcesses((prev) =>
       prev.map((p) => {
@@ -241,6 +245,17 @@ export default function App() {
               updated.remainingBurst = Math.max(0, val - (updated.executedBurst || 0));
             }
           }
+        } else if (field === 'ioDuration') {
+          if (rawValue === '') {
+            updated.ioDuration = '';
+          } else {
+            const val = Math.max(0, parseInt(rawValue, 10) || 0);
+            updated.ioDuration = val;
+            updated.ioAfter = val > 0 ? Math.max(1, Math.floor(Number(updated.totalBurst || 4) / 2)) : 0;
+            if (updated.state === PROCESS_STATES.WAITING) {
+              updated.ioRemaining = val;
+            }
+          }
         }
 
         return updated;
@@ -274,6 +289,11 @@ export default function App() {
             } else {
               updated.remainingBurst = Math.max(0, 1 - (updated.executedBurst || 0));
             }
+          }
+        } else if (field === 'ioDuration') {
+          if (updated.ioDuration === '' || isNaN(Number(updated.ioDuration))) {
+            updated.ioDuration = 0;
+            updated.ioAfter = 0;
           }
         } else if (field === 'name') {
           if (!updated.name || !updated.name.trim()) {
