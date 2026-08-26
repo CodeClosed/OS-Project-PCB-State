@@ -79,6 +79,8 @@ export default function ProcessTable({
         let btIdx = -1;
         let priorityIdx = -1;
         let pidIdx = -1;
+        let ioAfterIdx = -1;
+        let ioDurationIdx = -1;
 
         // Smart Header Identification
         firstLineCols.forEach((col, idx) => {
@@ -97,6 +99,12 @@ export default function ProcessTable({
           } else if (col === 'pid' || col === 'id' || col === '#') {
             pidIdx = idx;
             hasHeader = true;
+          } else if (col === 'io_after' || col === 'ioafter' || col === 'io after' || col === 'io') {
+            ioAfterIdx = idx;
+            hasHeader = true;
+          } else if (col === 'io_duration' || col === 'ioduration' || col === 'io duration' || col === 'wait' || col === 'i/o') {
+            ioDurationIdx = idx;
+            hasHeader = true;
           }
         });
 
@@ -112,6 +120,8 @@ export default function ProcessTable({
           let arrivalTime = 0;
           let totalBurst = 4;
           let priority = 1;
+          let ioAfter = 0;
+          let ioDuration = 0;
 
           if (hasHeader) {
             if (pidIdx !== -1 && !isNaN(Number(cols[pidIdx]))) pid = Number(cols[pidIdx]);
@@ -119,9 +129,28 @@ export default function ProcessTable({
             if (atIdx !== -1 && !isNaN(Number(cols[atIdx]))) arrivalTime = Math.max(0, Number(cols[atIdx]));
             if (btIdx !== -1 && !isNaN(Number(cols[btIdx]))) totalBurst = Math.max(1, Number(cols[btIdx]));
             if (priorityIdx !== -1 && !isNaN(Number(cols[priorityIdx]))) priority = Math.max(0, Number(cols[priorityIdx]));
+            if (ioAfterIdx !== -1 && !isNaN(Number(cols[ioAfterIdx]))) ioAfter = Math.max(0, Number(cols[ioAfterIdx]));
+            if (ioDurationIdx !== -1 && !isNaN(Number(cols[ioDurationIdx]))) ioDuration = Math.max(0, Number(cols[ioDurationIdx]));
           } else {
             // Headerless format matching common CSV patterns
-            if (cols.length >= 5) {
+            if (cols.length >= 7) {
+              // Format: PID, Name, AT, BT, Priority, IO_After, IO_Duration
+              pid = !isNaN(Number(cols[0])) ? Number(cols[0]) : index + 1;
+              name = cols[1] || `P${pid}`;
+              arrivalTime = Math.max(0, Number(cols[2]) || 0);
+              totalBurst = Math.max(1, Number(cols[3]) || 4);
+              priority = Math.max(0, Number(cols[4]) || 1);
+              ioAfter = Math.max(0, Number(cols[5]) || 0);
+              ioDuration = Math.max(0, Number(cols[6]) || 0);
+            } else if (cols.length === 6) {
+              // Format: Name, AT, BT, Priority, IO_After, IO_Duration
+              name = cols[0] || `P${index + 1}`;
+              arrivalTime = Math.max(0, Number(cols[1]) || 0);
+              totalBurst = Math.max(1, Number(cols[2]) || 4);
+              priority = Math.max(0, Number(cols[3]) || 1);
+              ioAfter = Math.max(0, Number(cols[4]) || 0);
+              ioDuration = Math.max(0, Number(cols[5]) || 0);
+            } else if (cols.length === 5) {
               // Format: PID, Name, AT, BT, Priority
               pid = !isNaN(Number(cols[0])) ? Number(cols[0]) : index + 1;
               name = cols[1] || `P${pid}`;
@@ -153,6 +182,8 @@ export default function ProcessTable({
               arrivalTime,
               totalBurst,
               priority,
+              ioAfter,
+              ioDuration,
               memoryMB: 32,
             })
           );

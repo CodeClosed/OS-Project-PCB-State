@@ -232,7 +232,30 @@ export function executeStep(processes, clockTick, algorithm, timeQuantum = 2, ga
     return p;
   });
 
-  // 5. Execute 1 CPU cycle on RUNNING process during interval [T, T+1]
+  // 5. Progress all processes in WAITING state during interval [T, T+1]
+  newProcesses = newProcesses.map((p) => {
+    if (p.state === PROCESS_STATES.WAITING) {
+      const remainingIO = (p.ioRemaining || p.ioDuration || 1) - 1;
+      if (remainingIO <= 0) {
+        globalSequence++;
+        eventLogs.push(`[T+${nextTick}] ${p.name} completed I/O operation ➔ Re-admitted to READY queue`);
+        return {
+          ...p,
+          state: PROCESS_STATES.READY,
+          ioRemaining: 0,
+          readyEnterTime: nextTick,
+          queueSeq: globalSequence,
+        };
+      }
+      return {
+        ...p,
+        ioRemaining: remainingIO,
+      };
+    }
+    return p;
+  });
+
+  // 6. Execute 1 CPU cycle on RUNNING process during interval [T, T+1]
   if (runningIndex !== -1) {
     let running = newProcesses[runningIndex];
     const newRemaining = running.remainingBurst - 1;
@@ -274,6 +297,23 @@ export function executeStep(processes, clockTick, algorithm, timeQuantum = 2, ga
         pc: nextPC,
         r0: nextR0,
       };
+    } else if (running.ioAfter > 0 && newExecuted >= running.ioAfter && running.ioDuration > 0) {
+      // Process requests I/O operation at nextTick ➔ moves to WAITING
+      eventLogs.push(
+        `[T+${nextTick}] ${running.name} executed ${newExecuted}t CPU burst, requested I/O (${running.ioDuration}t) ➔ WAITING`
+      );
+
+      newProcesses[runningIndex] = {
+        ...running,
+        state: PROCESS_STATES.WAITING,
+        remainingBurst: newRemaining,
+        executedBurst: newExecuted,
+        ioRemaining: running.ioDuration,
+        ioAfter: 0, // Reset I/O trigger after firing
+        quantumUsed: 0,
+        pc: nextPC,
+        r0: nextR0,
+      };
     } else {
       newProcesses[runningIndex] = {
         ...running,
@@ -284,7 +324,6 @@ export function executeStep(processes, clockTick, algorithm, timeQuantum = 2, ga
         r0: nextR0,
       };
     }
-  } else {
     // CPU was IDLE during interval [currentTick, nextTick]
     newGantt.push({
       start: currentTick,
