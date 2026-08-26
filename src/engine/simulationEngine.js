@@ -324,6 +324,7 @@ export function executeStep(processes, clockTick, algorithm, timeQuantum = 2, ga
         r0: nextR0,
       };
     }
+  } else {
     // CPU was IDLE during interval [currentTick, nextTick]
     newGantt.push({
       start: currentTick,
