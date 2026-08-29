@@ -18,8 +18,9 @@ export default function ProcessTable({
   const [quickName, setQuickName] = useState(`P${nextPid}`);
   const [quickPriority, setQuickPriority] = useState(1);
   const [quickAT, setQuickAT] = useState(0);
-  const [quickBurst, setQuickBurst] = useState(4);
+  const [quickBurst1, setQuickBurst1] = useState(4);
   const [quickIO, setQuickIO] = useState(0);
+  const [quickBurst2, setQuickBurst2] = useState(0);
   const fileInputRef = useRef(null);
 
   const usesPriority = algorithm === 'PRIORITY_NP' || algorithm === 'PRIORITY_P';
@@ -35,18 +36,19 @@ export default function ProcessTable({
     const name = quickName && quickName.trim() ? quickName.trim() : `P${nextPid}`;
     const priority = quickPriority !== '' && !isNaN(Number(quickPriority)) ? Number(quickPriority) : 1;
     const arrivalTime = quickAT !== '' && !isNaN(Number(quickAT)) ? Number(quickAT) : 0;
-    const totalBurst = quickBurst !== '' && !isNaN(Number(quickBurst)) && Number(quickBurst) >= 1 ? Number(quickBurst) : 4;
+    const cpuBurst1 = quickBurst1 !== '' && !isNaN(Number(quickBurst1)) && Number(quickBurst1) >= 1 ? Number(quickBurst1) : 4;
     const ioDuration = quickIO !== '' && !isNaN(Number(quickIO)) ? Number(quickIO) : 0;
-    const ioAfter = ioDuration > 0 ? Math.max(1, Math.floor(totalBurst / 2)) : 0;
+    const cpuBurst2 = quickBurst2 !== '' && !isNaN(Number(quickBurst2)) ? Math.max(0, Number(quickBurst2)) : 0;
 
     if (onQuickAddProcess) {
       onQuickAddProcess({
         name,
         priority,
         arrivalTime,
-        totalBurst,
+        cpuBurst1,
         ioDuration,
-        ioAfter,
+        cpuBurst2,
+        totalBurst: cpuBurst1 + cpuBurst2,
         memoryMB: 32,
       });
     }
@@ -81,7 +83,8 @@ export default function ProcessTable({
         let hasHeader = false;
         let nameIdx = -1;
         let atIdx = -1;
-        let btIdx = -1;
+        let bt1Idx = -1;
+        let bt2Idx = -1;
         let priorityIdx = -1;
         let pidIdx = -1;
         let ioAfterIdx = -1;
@@ -95,9 +98,37 @@ export default function ProcessTable({
           } else if (col === 'at' || col === 'arrival' || col === 'arrival time' || col === 'arrivaltime') {
             atIdx = idx;
             hasHeader = true;
-          } else if (col === 'bt' || col === 'burst' || col === 'burst time' || col === 'bursttime' || col === 'cpu burst' || col === 'cpu (bt)' || col === 'cpu') {
-            btIdx = idx;
+          } else if (
+            col === 'bt2' ||
+            col === 'cpu2' ||
+            col === 'burst 2' ||
+            col === 'cpu burst 2' ||
+            col === 'burst2' ||
+            col === 'cpu2 (bt2)' ||
+            col === 'cpu 2'
+          ) {
+            bt2Idx = idx;
             hasHeader = true;
+          } else if (
+            col === 'bt1' ||
+            col === 'cpu1' ||
+            col === 'burst 1' ||
+            col === 'cpu burst 1' ||
+            col === 'burst1' ||
+            col === 'cpu1 (bt1)' ||
+            col === 'cpu 1' ||
+            col === 'bt' ||
+            col === 'burst' ||
+            col === 'burst time' ||
+            col === 'bursttime' ||
+            col === 'cpu burst' ||
+            col === 'cpu (bt)' ||
+            col === 'cpu'
+          ) {
+            if (bt1Idx === -1) {
+              bt1Idx = idx;
+              hasHeader = true;
+            }
           } else if (col === 'priority' || col === 'prio' || col === 'p') {
             priorityIdx = idx;
             hasHeader = true;
@@ -136,7 +167,8 @@ export default function ProcessTable({
           let pid = index + 1;
           let name = `P${pid}`;
           let arrivalTime = 0;
-          let totalBurst = 4;
+          let cpuBurst1 = 4;
+          let cpuBurst2 = 0;
           let priority = 1;
           let ioAfter = 0;
           let ioDuration = 0;
@@ -145,55 +177,55 @@ export default function ProcessTable({
             if (pidIdx !== -1 && !isNaN(Number(cols[pidIdx]))) pid = Number(cols[pidIdx]);
             if (nameIdx !== -1 && cols[nameIdx]) name = cols[nameIdx];
             if (atIdx !== -1 && !isNaN(Number(cols[atIdx]))) arrivalTime = Math.max(0, Number(cols[atIdx]));
-            if (btIdx !== -1 && !isNaN(Number(cols[btIdx]))) totalBurst = Math.max(1, Number(cols[btIdx]));
+            if (bt1Idx !== -1 && !isNaN(Number(cols[bt1Idx]))) cpuBurst1 = Math.max(1, Number(cols[bt1Idx]));
+            if (bt2Idx !== -1 && !isNaN(Number(cols[bt2Idx]))) cpuBurst2 = Math.max(0, Number(cols[bt2Idx]));
             if (priorityIdx !== -1 && !isNaN(Number(cols[priorityIdx]))) priority = Math.max(0, Number(cols[priorityIdx]));
             if (ioAfterIdx !== -1 && !isNaN(Number(cols[ioAfterIdx]))) ioAfter = Math.max(0, Number(cols[ioAfterIdx]));
             if (ioDurationIdx !== -1 && !isNaN(Number(cols[ioDurationIdx]))) ioDuration = Math.max(0, Number(cols[ioDurationIdx]));
             if (ioDuration > 0 && ioAfter === 0) {
-              ioAfter = Math.max(1, Math.floor(totalBurst / 2));
+              ioAfter = cpuBurst1;
             }
           } else {
             // Headerless format matching common CSV patterns
             if (cols.length >= 7) {
-              // Format: PID, Name, AT, BT, Priority, IO_After, IO_Duration
+              // Format: PID, Name, AT, BT1, IO, BT2, Priority
               pid = !isNaN(Number(cols[0])) ? Number(cols[0]) : index + 1;
               name = cols[1] || `P${pid}`;
               arrivalTime = Math.max(0, Number(cols[2]) || 0);
-              totalBurst = Math.max(1, Number(cols[3]) || 4);
-              priority = Math.max(0, Number(cols[4]) || 1);
-              ioAfter = Math.max(0, Number(cols[5]) || 0);
-              ioDuration = Math.max(0, Number(cols[6]) || 0);
+              cpuBurst1 = Math.max(1, Number(cols[3]) || 4);
+              ioDuration = Math.max(0, Number(cols[4]) || 0);
+              cpuBurst2 = Math.max(0, Number(cols[5]) || 0);
+              priority = Math.max(0, Number(cols[6]) || 1);
             } else if (cols.length === 6) {
-              // Format: PID, Name, AT, BT, Priority, IO_Duration
+              // Format: PID, Name, AT, BT1, IO, BT2
               pid = !isNaN(Number(cols[0])) ? Number(cols[0]) : index + 1;
               name = cols[1] || `P${pid}`;
               arrivalTime = Math.max(0, Number(cols[2]) || 0);
-              totalBurst = Math.max(1, Number(cols[3]) || 4);
-              priority = Math.max(0, Number(cols[4]) || 1);
-              ioDuration = Math.max(0, Number(cols[5]) || 0);
-              ioAfter = ioDuration > 0 ? Math.max(1, Math.floor(totalBurst / 2)) : 0;
+              cpuBurst1 = Math.max(1, Number(cols[3]) || 4);
+              ioDuration = Math.max(0, Number(cols[4]) || 0);
+              cpuBurst2 = Math.max(0, Number(cols[5]) || 0);
             } else if (cols.length === 5) {
               // Format: PID, Name, AT, BT, Priority
               pid = !isNaN(Number(cols[0])) ? Number(cols[0]) : index + 1;
               name = cols[1] || `P${pid}`;
               arrivalTime = Math.max(0, Number(cols[2]) || 0);
-              totalBurst = Math.max(1, Number(cols[3]) || 4);
+              cpuBurst1 = Math.max(1, Number(cols[3]) || 4);
               priority = Math.max(0, Number(cols[4]) || 1);
             } else if (cols.length === 4) {
               // Format: Name, AT, BT, Priority
               name = cols[0] || `P${index + 1}`;
               arrivalTime = Math.max(0, Number(cols[1]) || 0);
-              totalBurst = Math.max(1, Number(cols[2]) || 4);
+              cpuBurst1 = Math.max(1, Number(cols[2]) || 4);
               priority = Math.max(0, Number(cols[3]) || 1);
             } else if (cols.length === 3) {
               // Format: Name, AT, BT
               name = cols[0] || `P${index + 1}`;
               arrivalTime = Math.max(0, Number(cols[1]) || 0);
-              totalBurst = Math.max(1, Number(cols[2]) || 4);
+              cpuBurst1 = Math.max(1, Number(cols[2]) || 4);
             } else if (cols.length === 2) {
               // Format: AT, BT
               arrivalTime = Math.max(0, Number(cols[0]) || 0);
-              totalBurst = Math.max(1, Number(cols[1]) || 4);
+              cpuBurst1 = Math.max(1, Number(cols[1]) || 4);
             }
           }
 
@@ -202,7 +234,9 @@ export default function ProcessTable({
               pid,
               name,
               arrivalTime,
-              totalBurst,
+              cpuBurst1,
+              cpuBurst2,
+              totalBurst: cpuBurst1 + cpuBurst2,
               priority,
               ioAfter,
               ioDuration,
@@ -234,8 +268,16 @@ export default function ProcessTable({
   // Export current table to CSV file
   const handleExportCSV = () => {
     if (processes.length === 0) return;
-    const headers = ['PID', 'Name', 'AT', 'BT', 'Priority'];
-    const rows = processes.map((p) => [p.pid, p.name, p.arrivalTime, p.totalBurst, p.priority]);
+    const headers = ['PID', 'Name', 'AT', 'BT1', 'IO', 'BT2', 'Priority'];
+    const rows = processes.map((p) => [
+      p.pid,
+      p.name,
+      p.arrivalTime,
+      p.cpuBurst1 !== undefined ? p.cpuBurst1 : p.totalBurst,
+      p.ioDuration || 0,
+      p.cpuBurst2 || 0,
+      p.priority,
+    ]);
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -250,7 +292,7 @@ export default function ProcessTable({
 
   // Download sample CSV template
   const handleDownloadSample = () => {
-    const sample = 'PID,Name,AT,BT,Priority\n1,P1,0,6,3\n2,P2,1,8,1\n3,P3,2,3,4\n4,P4,3,4,2';
+    const sample = 'PID,Name,AT,BT1,IO,BT2,Priority\n1,P1,0,4,2,3,1\n2,P2,1,3,0,0,2\n3,P3,2,2,1,2,1\n4,P4,3,4,0,0,3';
     const blob = new Blob([sample], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -355,8 +397,9 @@ export default function ProcessTable({
                 </div>
               </th>
               <th className="py-2.5 px-2.5 font-bold text-slate-700">AT</th>
-              <th className="py-2.5 px-2.5 font-bold text-cyan-700">CPU BURST (BT)</th>
+              <th className="py-2.5 px-2.5 font-bold text-cyan-700">CPU BURST 1 (BT1)</th>
               <th className="py-2.5 px-2.5 font-bold text-amber-700">I/O BURST (IO)</th>
+              <th className="py-2.5 px-2.5 font-bold text-cyan-700">CPU BURST 2 (BT2)</th>
               <th className="py-2.5 px-2.5 font-bold text-cyan-800">CT</th>
               <th className="py-2.5 px-2.5 font-bold text-rose-800">TAT</th>
               <th className="py-2.5 px-2.5 font-bold text-emerald-800">WT</th>
@@ -366,7 +409,7 @@ export default function ProcessTable({
           <tbody className="divide-y divide-slate-100">
             {processes.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-6 text-center text-slate-400 italic">
+                <td colSpan={12} className="py-6 text-center text-slate-400 italic">
                   Table is empty. Use the quick-add bar below to add processes.
                 </td>
               </tr>
@@ -449,22 +492,24 @@ export default function ProcessTable({
                       </div>
                     </td>
 
-                    {/* Editable CPU Burst Time (BT) */}
+                    {/* Editable CPU Burst 1 Time (BT1) */}
                     <td className="py-2 px-2.5">
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        {p.executedBurst > 0 ? (
+                        {p.executedBurst1 > 0 && p.burstPhase === 'CPU1' ? (
                           <>
-                            <span className="text-cyan-700 font-bold text-[11px]">{p.remainingBurst}t /</span>
+                            <span className="text-cyan-700 font-bold text-[11px]">
+                              {Math.max(0, (p.cpuBurst1 !== undefined ? p.cpuBurst1 : p.totalBurst || 4) - p.executedBurst1)}t /
+                            </span>
                             <input
                               type="number"
                               min="1"
                               step="1"
-                              value={p.totalBurst !== undefined ? p.totalBurst : ''}
-                              onChange={(e) => onUpdateProcess && onUpdateProcess(p.pid, 'totalBurst', e.target.value)}
-                              onBlur={(e) => onBlurProcess && onBlurProcess(p.pid, 'totalBurst', e.target.value)}
+                              value={p.cpuBurst1 !== undefined ? p.cpuBurst1 : (p.totalBurst || 4)}
+                              onChange={(e) => onUpdateProcess && onUpdateProcess(p.pid, 'cpuBurst1', e.target.value)}
+                              onBlur={(e) => onBlurProcess && onBlurProcess(p.pid, 'cpuBurst1', e.target.value)}
                               onFocus={() => onSelectPid(p.pid)}
                               className="w-12 bg-white border border-cyan-200 hover:border-cyan-400 focus:border-cyan-500 rounded px-1 py-0.5 text-center font-bold text-cyan-800 focus:outline-none transition-colors shadow-2xs text-xs"
-                              title="Directly edit Total Burst Time (ticks)"
+                              title="Directly edit CPU Burst 1 (ticks, min 1)"
                             />
                             <span className="text-cyan-700 font-bold text-[11px]">t</span>
                           </>
@@ -474,12 +519,12 @@ export default function ProcessTable({
                               type="number"
                               min="1"
                               step="1"
-                              value={p.totalBurst !== undefined ? p.totalBurst : ''}
-                              onChange={(e) => onUpdateProcess && onUpdateProcess(p.pid, 'totalBurst', e.target.value)}
-                              onBlur={(e) => onBlurProcess && onBlurProcess(p.pid, 'totalBurst', e.target.value)}
+                              value={p.cpuBurst1 !== undefined ? p.cpuBurst1 : (p.totalBurst || 4)}
+                              onChange={(e) => onUpdateProcess && onUpdateProcess(p.pid, 'cpuBurst1', e.target.value)}
+                              onBlur={(e) => onBlurProcess && onBlurProcess(p.pid, 'cpuBurst1', e.target.value)}
                               onFocus={() => onSelectPid(p.pid)}
-                              className="w-14 bg-white border border-cyan-200 hover:border-cyan-400 focus:border-cyan-500 rounded px-1.5 py-0.5 text-center font-bold text-cyan-800 focus:outline-none transition-colors shadow-2xs text-xs"
-                              title="Directly edit Burst Time (ticks)"
+                              className="w-12 bg-white border border-cyan-200 hover:border-cyan-400 focus:border-cyan-500 rounded px-1.5 py-0.5 text-center font-bold text-cyan-800 focus:outline-none transition-colors shadow-2xs text-xs"
+                              title="Directly edit CPU Burst 1 (ticks, min 1)"
                             />
                             <span className="text-cyan-700 font-bold text-[11px]">t</span>
                           </>
@@ -509,9 +554,53 @@ export default function ProcessTable({
                                   ? 'border-amber-300 text-amber-800 hover:border-amber-400 focus:border-amber-500'
                                   : 'border-slate-200 text-slate-400 hover:border-slate-300 focus:border-blue-500'
                               }`}
-                              title="I/O Burst duration in ticks (0 = pure CPU job, >0 = requests I/O and moves to WAITING state)"
+                              title="I/O Burst duration in ticks (0 = pure CPU job, >0 = requests I/O and moves to WAITING state between CPU1 and CPU2)"
                             />
                             <span className="text-amber-700 font-bold text-[11px]">t</span>
+                          </>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Editable CPU Burst 2 Time (BT2) */}
+                    <td className="py-2 px-2.5">
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        {p.executedBurst2 > 0 && p.burstPhase === 'CPU2' ? (
+                          <>
+                            <span className="text-cyan-700 font-bold text-[11px]">
+                              {Math.max(0, (p.cpuBurst2 || 0) - p.executedBurst2)}t /
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={p.cpuBurst2 !== undefined ? p.cpuBurst2 : 0}
+                              onChange={(e) => onUpdateProcess && onUpdateProcess(p.pid, 'cpuBurst2', e.target.value)}
+                              onBlur={(e) => onBlurProcess && onBlurProcess(p.pid, 'cpuBurst2', e.target.value)}
+                              onFocus={() => onSelectPid(p.pid)}
+                              className="w-12 bg-white border border-cyan-200 hover:border-cyan-400 focus:border-cyan-500 rounded px-1 py-0.5 text-center font-bold text-cyan-800 focus:outline-none transition-colors shadow-2xs text-xs"
+                              title="Directly edit CPU Burst 2 (ticks after I/O)"
+                            />
+                            <span className="text-cyan-700 font-bold text-[11px]">t</span>
+                          </>
+                        ) : (
+                          <>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={p.cpuBurst2 !== undefined ? p.cpuBurst2 : 0}
+                              onChange={(e) => onUpdateProcess && onUpdateProcess(p.pid, 'cpuBurst2', e.target.value)}
+                              onBlur={(e) => onBlurProcess && onBlurProcess(p.pid, 'cpuBurst2', e.target.value)}
+                              onFocus={() => onSelectPid(p.pid)}
+                              className={`w-12 bg-white border rounded px-1 py-0.5 text-center font-bold text-xs focus:outline-none transition-colors shadow-2xs ${
+                                (Number(p.cpuBurst2) || 0) > 0
+                                  ? 'border-cyan-200 hover:border-cyan-400 focus:border-cyan-500 text-cyan-800'
+                                  : 'border-slate-200 text-slate-400 hover:border-slate-300 focus:border-blue-500'
+                              }`}
+                              title="Directly edit CPU Burst 2 (ticks after I/O, 0 = none)"
+                            />
+                            <span className="text-cyan-700 font-bold text-[11px]">t</span>
                           </>
                         )}
                       </div>
@@ -596,15 +685,15 @@ export default function ProcessTable({
         </div>
 
         <div className="flex items-center gap-1">
-          <span className="text-[11px] text-slate-500 font-medium">BT:</span>
+          <span className="text-[11px] text-cyan-700 font-medium">BT1:</span>
           <input
             type="number"
             min="1"
             step="1"
-            value={quickBurst}
-            onChange={(e) => setQuickBurst(e.target.value === '' ? '' : e.target.value)}
-            className="w-14 bg-white border border-slate-300 rounded px-1.5 py-1 text-slate-900 font-bold focus:outline-none focus:border-blue-500 text-center"
-            title="Burst Time (ticks)"
+            value={quickBurst1}
+            onChange={(e) => setQuickBurst1(e.target.value === '' ? '' : e.target.value)}
+            className="w-12 bg-white border border-slate-300 rounded px-1.5 py-1 text-slate-900 font-bold focus:outline-none focus:border-blue-500 text-center"
+            title="CPU Burst 1 (ticks, min 1)"
           />
         </div>
 
@@ -618,6 +707,19 @@ export default function ProcessTable({
             onChange={(e) => setQuickIO(e.target.value === '' ? '' : e.target.value)}
             className="w-12 bg-white border border-amber-300 rounded px-1.5 py-1 text-amber-900 font-bold focus:outline-none focus:border-amber-500 text-center"
             title="I/O Burst duration (ticks, 0 = none)"
+          />
+        </div>
+
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] text-cyan-700 font-medium">BT2:</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={quickBurst2}
+            onChange={(e) => setQuickBurst2(e.target.value === '' ? '' : e.target.value)}
+            className="w-12 bg-white border border-cyan-300 rounded px-1.5 py-1 text-cyan-900 font-bold focus:outline-none focus:border-cyan-500 text-center"
+            title="CPU Burst 2 after I/O (ticks, 0 = none)"
           />
         </div>
 

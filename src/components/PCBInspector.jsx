@@ -31,15 +31,44 @@ export default function PCBInspector({ process }) {
       {/* PCB Data Grid */}
       <div className="grid grid-cols-2 gap-2 text-[11px]">
         
-        {/* Priority & Burst */}
+        {/* Priority */}
         <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
           <span className="text-slate-500 block text-[10px] font-medium">Priority</span>
           <span className="font-bold text-amber-700">Level {process.priority}</span>
         </div>
 
+        {/* Current Execution Phase */}
         <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-          <span className="text-slate-500 block text-[10px] font-medium">CPU Burst (Left / Total)</span>
-          <span className="font-bold text-cyan-800">{process.remainingBurst}t / {process.totalBurst}t</span>
+          <span className="text-slate-500 block text-[10px] font-medium">Execution Phase</span>
+          <span className="font-bold text-blue-700">
+            {process.state === 'TERMINATED'
+              ? 'Complete'
+              : process.state === 'WAITING'
+              ? 'I/O Waiting'
+              : process.burstPhase === 'CPU2'
+              ? 'Phase 2 (CPU2)'
+              : 'Phase 1 (CPU1)'}
+          </span>
+        </div>
+
+        {/* CPU Burst 1 */}
+        <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+          <span className="text-slate-500 block text-[10px] font-medium">CPU Burst 1 (BT1)</span>
+          <span className="font-bold text-cyan-800">{process.cpuBurst1 !== undefined ? process.cpuBurst1 : process.totalBurst}t</span>
+        </div>
+
+        {/* CPU Burst 2 */}
+        <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+          <span className="text-slate-500 block text-[10px] font-medium">CPU Burst 2 (BT2)</span>
+          <span className="font-bold text-cyan-800">{process.cpuBurst2 || 0}t</span>
+        </div>
+
+        {/* Total Burst & Remaining */}
+        <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 col-span-2">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500 text-[10px] font-medium">Total CPU Burst (Left / Total)</span>
+            <span className="font-bold text-cyan-800">{process.remainingBurst}t / {process.totalBurst}t</span>
+          </div>
         </div>
 
         {/* Program Counter & Registers */}
