@@ -20,7 +20,7 @@ export default function Navbar({
   return (
     <header className="border-b border-slate-200 bg-white sticky top-0 z-30 px-4 lg:px-6 py-3 font-mono shadow-xs">
       <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-        
+
         {/* Branding & Clock */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-xs">
@@ -40,11 +40,10 @@ export default function Navbar({
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <button
             onClick={onTogglePlay}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-bold transition-colors shadow-xs cursor-pointer shrink-0 ${
-              isRunning
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-bold transition-colors shadow-xs cursor-pointer shrink-0 ${isRunning
                 ? 'bg-amber-500 hover:bg-amber-600 text-white'
                 : 'bg-blue-600 hover:bg-blue-700 text-white'
-            }`}
+              }`}
           >
             {isRunning ? <><Pause className="w-3.5 h-3.5" /> Pause</> : <><Play className="w-3.5 h-3.5 fill-white" /> Start</>}
           </button>

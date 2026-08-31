@@ -66,7 +66,9 @@ export function createProcess({
   name,
   priority = 1,
   arrivalTime = 0,
-  totalBurst = 6,
+  cpuBurst1,
+  totalBurst,
+  cpuBurst2 = 0,
   memoryMB = 32,
   ioAfter = 0,
   ioDuration = 0,
@@ -74,6 +76,11 @@ export function createProcess({
   const paletteIndex = (pid - 1) % PROCESS_PALETTES.length;
   const palette = PROCESS_PALETTES[paletteIndex >= 0 ? paletteIndex : 0];
   const basePC = 0x00401000 + pid * 0x1000;
+
+  const b1 = cpuBurst1 !== undefined ? Math.max(1, Number(cpuBurst1)) : (totalBurst !== undefined ? Math.max(1, Number(totalBurst)) : 4);
+  const b2 = cpuBurst2 !== undefined && !isNaN(Number(cpuBurst2)) ? Math.max(0, Number(cpuBurst2)) : 0;
+  const combinedTotal = b1 + b2;
+  const ioDur = ioDuration !== undefined && !isNaN(Number(ioDuration)) ? Math.max(0, Number(ioDuration)) : 0;
 
   return {
     pid: Number(pid),
@@ -84,16 +91,21 @@ export function createProcess({
 
     // Timing & Bursts
     arrivalTime: Number(arrivalTime),
-    totalBurst: Number(totalBurst),
-    remainingBurst: Number(totalBurst),
+    cpuBurst1: b1,
+    cpuBurst2: b2,
+    totalBurst: combinedTotal,
+    remainingBurst: combinedTotal,
     executedBurst: 0,
+    executedBurst1: 0,
+    executedBurst2: 0,
+    burstPhase: 'CPU1', // 'CPU1' | 'IO' | 'CPU2' | 'DONE'
     quantumUsed: 0,
     readyEnterTime: Number(arrivalTime),
     queueSeq: Number(pid),
 
     // I/O config
-    ioAfter: Number(ioAfter),
-    ioDuration: Number(ioDuration),
+    ioAfter: Number(ioAfter) || (ioDur > 0 ? b1 : 0),
+    ioDuration: ioDur,
     ioRemaining: 0,
 
     // Hardware PCB Registers
@@ -115,7 +127,8 @@ export function createProcess({
 }
 
 export const INITIAL_PROCESSES = [
-  createProcess({ pid: 1, name: 'P1', priority: 1, arrivalTime: 0, totalBurst: 24, memoryMB: 64 }),
-  createProcess({ pid: 2, name: 'P2', priority: 1, arrivalTime: 0, totalBurst: 3, memoryMB: 32 }),
-  createProcess({ pid: 3, name: 'P3', priority: 1, arrivalTime: 0, totalBurst: 3, memoryMB: 48 }),
+  createProcess({ pid: 1, name: 'P1', priority: 1, arrivalTime: 0, cpuBurst1: 4, ioDuration: 2, cpuBurst2: 3, memoryMB: 64 }),
+  createProcess({ pid: 2, name: 'P2', priority: 2, arrivalTime: 1, cpuBurst1: 3, ioDuration: 0, cpuBurst2: 0, memoryMB: 32 }),
+  createProcess({ pid: 3, name: 'P3', priority: 1, arrivalTime: 2, cpuBurst1: 2, ioDuration: 1, cpuBurst2: 2, memoryMB: 48 }),
+  createProcess({ pid: 4, name: 'P4', priority: 3, arrivalTime: 3, cpuBurst1: 4, ioDuration: 0, cpuBurst2: 0, memoryMB: 32 }),
 ];

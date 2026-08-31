@@ -6,8 +6,9 @@ export default function NewProcessModal({ isOpen, onClose, onCreateProcess, next
   const [name, setName] = useState(`Process ${nextPid}`);
   const [priority, setPriority] = useState(1);
   const [arrivalTime, setArrivalTime] = useState(currentTick);
-  const [burst, setBurst] = useState(6);
+  const [cpuBurst1, setCpuBurst1] = useState(4);
   const [ioDuration, setIoDuration] = useState(0);
+  const [cpuBurst2, setCpuBurst2] = useState(0);
   const [memoryMB, setMemoryMB] = useState(32);
 
   // Update defaults when opened
@@ -15,7 +16,9 @@ export default function NewProcessModal({ isOpen, onClose, onCreateProcess, next
     if (isOpen) {
       setName(`P${nextPid} (Task)`);
       setArrivalTime(currentTick);
+      setCpuBurst1(4);
       setIoDuration(0);
+      setCpuBurst2(0);
     }
   }, [isOpen, nextPid, currentTick]);
 
@@ -23,19 +26,21 @@ export default function NewProcessModal({ isOpen, onClose, onCreateProcess, next
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const totalBurst = Math.max(1, Number(burst));
+    const b1 = Math.max(1, Number(cpuBurst1) || 4);
     const ioDur = Math.max(0, Number(ioDuration) || 0);
-    const ioAfter = ioDur > 0 ? Math.max(1, Math.floor(totalBurst / 2)) : 0;
+    const b2 = Math.max(0, Number(cpuBurst2) || 0);
+    const totalBurst = b1 + b2;
 
     const newProc = createProcess({
       pid: nextPid,
       name: name.trim() || `P${nextPid}`,
       priority: Math.max(0, Number(priority)),
       arrivalTime: Math.max(0, Number(arrivalTime)),
+      cpuBurst1: b1,
+      ioDuration: ioDur,
+      cpuBurst2: b2,
       totalBurst,
       memoryMB: Math.max(1, Number(memoryMB)),
-      ioAfter,
-      ioDuration: ioDur,
     });
     onCreateProcess(newProc);
     onClose();
@@ -122,29 +127,29 @@ export default function NewProcessModal({ isOpen, onClose, onCreateProcess, next
             </div>
           </div>
 
-          {/* CPU Burst & I/O Burst Times */}
-          <div className="grid grid-cols-2 gap-2.5">
+          {/* CPU Burst 1, I/O Burst & CPU Burst 2 Times */}
+          <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="text-slate-600 block mb-1 font-medium text-[11px]">
-                CPU Burst <span className="text-slate-400 font-normal">(BT: 1 to ∞)</span>
+                CPU Burst 1 <span className="text-slate-400 font-normal">(BT1: 1+)</span>
               </label>
               <div className="relative">
                 <input
                   type="number"
                   min="1"
                   step="1"
-                  value={burst}
-                  onChange={(e) => setBurst(e.target.value === '' ? '' : Number(e.target.value))}
+                  value={cpuBurst1}
+                  onChange={(e) => setCpuBurst1(e.target.value === '' ? '' : Number(e.target.value))}
                   required
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:border-cyan-500 font-bold"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2 text-slate-900 focus:outline-none focus:border-cyan-500 font-bold text-center"
                 />
-                <span className="absolute right-2.5 top-2 text-[10px] text-slate-400 font-bold">ticks</span>
+                <span className="absolute right-2 top-2 text-[10px] text-slate-400 font-bold">t</span>
               </div>
             </div>
 
             <div>
               <label className="text-slate-600 block mb-1 font-medium text-[11px]">
-                I/O Burst <span className="text-slate-400 font-normal">(IO: 0 to ∞)</span>
+                I/O Burst <span className="text-slate-400 font-normal">(IO: 0+)</span>
               </label>
               <div className="relative">
                 <input
@@ -153,11 +158,35 @@ export default function NewProcessModal({ isOpen, onClose, onCreateProcess, next
                   step="1"
                   value={ioDuration}
                   onChange={(e) => setIoDuration(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:border-amber-500 font-bold"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2 text-slate-900 focus:outline-none focus:border-amber-500 font-bold text-center"
                 />
-                <span className="absolute right-2.5 top-2 text-[10px] text-slate-400 font-bold">ticks</span>
+                <span className="absolute right-2 top-2 text-[10px] text-slate-400 font-bold">t</span>
               </div>
             </div>
+
+            <div>
+              <label className="text-slate-600 block mb-1 font-medium text-[11px]">
+                CPU Burst 2 <span className="text-slate-400 font-normal">(BT2: 0+)</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={cpuBurst2}
+                  onChange={(e) => setCpuBurst2(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2 text-slate-900 focus:outline-none focus:border-cyan-500 font-bold text-center"
+                />
+                <span className="absolute right-2 top-2 text-[10px] text-slate-400 font-bold">t</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-cyan-50/60 border border-cyan-200/60 text-[11px]">
+            <span className="text-cyan-800 font-medium">Total CPU Execution:</span>
+            <span className="font-bold text-cyan-900">
+              {(Number(cpuBurst1) || 0) + (Number(cpuBurst2) || 0)} ticks {Number(ioDuration) > 0 ? `+ ${Number(ioDuration)}t I/O` : ''}
+            </span>
           </div>
 
           {/* Memory Footprint (1 to ∞ MB) */}

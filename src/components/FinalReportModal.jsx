@@ -69,7 +69,7 @@ export default function FinalReportModal({ isOpen, onClose, processes, clockTick
             <span className="text-xl font-bold text-emerald-800">
               {avgWT} <span className="text-xs font-normal text-slate-500">ticks</span>
             </span>
-            <span className="text-[10px] text-slate-400 font-medium">WT = TAT - BT</span>
+            <span className="text-[10px] text-slate-400 font-medium">WT = TAT - BT - IO</span>
           </div>
 
           <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex flex-col gap-1 shadow-2xs">
@@ -107,8 +107,10 @@ export default function FinalReportModal({ isOpen, onClose, processes, clockTick
                   <th className="py-2.5 px-3">PID</th>
                   <th className="py-2.5 px-3">PROCESS</th>
                   <th className="py-2.5 px-3">ARRIVAL (AT)</th>
-                  <th className="py-2.5 px-3">CPU (BT)</th>
-                  <th className="py-2.5 px-3 text-amber-700">I/O BURST</th>
+                  <th className="py-2.5 px-3 text-cyan-700">CPU 1 (BT1)</th>
+                  <th className="py-2.5 px-3 text-amber-700">I/O (IO)</th>
+                  <th className="py-2.5 px-3 text-cyan-700">CPU 2 (BT2)</th>
+                  <th className="py-2.5 px-3 text-slate-700">TOTAL BT</th>
                   <th className="py-2.5 px-3">PRIORITY</th>
                   <th className="py-2.5 px-3 text-cyan-800">COMPLETION (CT)</th>
                   <th className="py-2.5 px-3 text-rose-800">TURNAROUND (TAT)</th>
@@ -123,15 +125,19 @@ export default function FinalReportModal({ isOpen, onClose, processes, clockTick
                   const tat = p.turnaroundTime !== null ? `${p.turnaroundTime}t` : `${clockTick - p.arrivalTime}t*`;
                   const wt = `${p.waitingTime}t`;
                   const rt = p.responseTime !== null ? `${p.responseTime}t` : '—';
-                  const io = (p.ioDuration || 0) > 0 ? `${p.ioDuration}t` : '—';
+                  const io = (p.ioDuration || 0) > 0 ? `${p.ioDuration}t` : '0t';
+                  const bt1 = p.cpuBurst1 !== undefined ? p.cpuBurst1 : p.totalBurst;
+                  const bt2 = p.cpuBurst2 !== undefined ? p.cpuBurst2 : 0;
 
                   return (
                     <tr key={p.pid} className="hover:bg-slate-50">
                       <td className="py-2.5 px-3 font-bold text-slate-700">#{p.pid}</td>
                       <td className="py-2.5 px-3 font-bold text-slate-900">{p.name}</td>
                       <td className="py-2.5 px-3 text-slate-600">T+{p.arrivalTime}</td>
-                      <td className="py-2.5 px-3 text-slate-600 font-medium">{p.totalBurst}t</td>
+                      <td className="py-2.5 px-3 text-cyan-700 font-medium">{bt1}t</td>
                       <td className="py-2.5 px-3 text-amber-700 font-bold">{io}</td>
+                      <td className="py-2.5 px-3 text-cyan-700 font-medium">{bt2}t</td>
+                      <td className="py-2.5 px-3 text-slate-700 font-bold">{p.totalBurst}t</td>
                       <td className="py-2.5 px-3 text-amber-700 font-bold">Lvl {p.priority}</td>
                       <td className="py-2.5 px-3 font-bold text-cyan-800">{ct}</td>
                       <td className="py-2.5 px-3 font-bold text-rose-700">{tat}</td>
@@ -154,7 +160,7 @@ export default function FinalReportModal({ isOpen, onClose, processes, clockTick
         <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-[11px] text-slate-600 flex flex-wrap items-center justify-between gap-2">
           <span><strong>CT</strong> = Time process finishes</span>
           <span><strong>TAT</strong> = CT - AT (Turnaround)</span>
-          <span><strong>WT</strong> = TAT - BT (Wait Time)</span>
+          <span><strong>WT</strong> = TAT - BT - IO (Wait Time)</span>
           <span><strong>RT</strong> = Start - AT (Response)</span>
         </div>
 

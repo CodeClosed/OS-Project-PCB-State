@@ -1,4 +1,4 @@
-import { PROCESS_STATES } from '../types/process';
+import { PROCESS_STATES } from '../types/process.js';
 
 /**
  * Valid OS State Transitions
@@ -23,11 +23,11 @@ export function resetEngineSequence() {
 }
 
 /**
- * Selects the next process from the ready queue based on the active scheduler
- * If priority, arrival time, or bursts are equal, tie-breaker always picks lowest PID (ascending)
+ * Sorts processes in the ready queue according to the active scheduling algorithm.
+ * Index 0 is always the top-most next process selected for CPU dispatch.
  */
-function selectCandidate(readyList, algorithm) {
-  if (!readyList || readyList.length === 0) return null;
+export function sortReadyQueue(readyList, algorithm) {
+  if (!readyList || readyList.length === 0) return [];
   const pool = [...readyList];
 
   switch (algorithm) {
@@ -39,7 +39,7 @@ function selectCandidate(readyList, algorithm) {
           (a.queueSeq ?? 0) - (b.queueSeq ?? 0) ||
           a.arrivalTime - b.arrivalTime ||
           a.pid - b.pid
-      )[0];
+      );
 
     case 'FCFS':
       // FIFO Arrival: Earliest Arrival Time, then queue sequence, then PID ascending
@@ -48,7 +48,7 @@ function selectCandidate(readyList, algorithm) {
           a.arrivalTime - b.arrivalTime ||
           (a.queueSeq ?? 0) - (b.queueSeq ?? 0) ||
           a.pid - b.pid
-      )[0];
+      );
 
     case 'SJF':
       // Shortest Job First (Total burst), then arrival time, then sequence, then PID ascending (Priority is ignored)
@@ -58,7 +58,7 @@ function selectCandidate(readyList, algorithm) {
           a.arrivalTime - b.arrivalTime ||
           (a.queueSeq ?? 0) - (b.queueSeq ?? 0) ||
           a.pid - b.pid
-      )[0];
+      );
 
     case 'SRTF':
       // Shortest Remaining Time First (Remaining burst), then arrival time, then sequence, then PID ascending (Priority is ignored)
@@ -68,7 +68,7 @@ function selectCandidate(readyList, algorithm) {
           a.arrivalTime - b.arrivalTime ||
           (a.queueSeq ?? 0) - (b.queueSeq ?? 0) ||
           a.pid - b.pid
-      )[0];
+      );
 
     case 'PRIORITY_NP':
     case 'PRIORITY_P':
@@ -79,11 +79,20 @@ function selectCandidate(readyList, algorithm) {
           a.arrivalTime - b.arrivalTime ||
           (a.queueSeq ?? 0) - (b.queueSeq ?? 0) ||
           a.pid - b.pid
-      )[0];
+      );
 
     default:
-      return pool.sort((a, b) => a.pid - b.pid)[0];
+      return pool.sort((a, b) => a.pid - b.pid);
   }
+}
+
+/**
+ * Selects the next process from the ready queue based on the active scheduler
+ * If priority, arrival time, or bursts are equal, tie-breaker always picks lowest PID (ascending)
+ */
+function selectCandidate(readyList, algorithm) {
+  const sorted = sortReadyQueue(readyList, algorithm);
+  return sorted.length > 0 ? sorted[0] : null;
 }
 
 /**
@@ -237,15 +246,37 @@ export function executeStep(processes, clockTick, algorithm, timeQuantum = 2, ga
     if (p.state === PROCESS_STATES.WAITING) {
       const remainingIO = (p.ioRemaining || p.ioDuration || 1) - 1;
       if (remainingIO <= 0) {
-        globalSequence++;
-        eventLogs.push(`[T+${nextTick}] ${p.name} completed I/O operation ➔ Re-admitted to READY queue`);
-        return {
-          ...p,
-          state: PROCESS_STATES.READY,
-          ioRemaining: 0,
-          readyEnterTime: nextTick,
-          queueSeq: globalSequence,
-        };
+        const b2 = p.cpuBurst2 || 0;
+        if (b2 > 0) {
+          globalSequence++;
+          eventLogs.push(`[T+${nextTick}] ${p.name} completed I/O operation (${p.ioDuration || 0}t) ➔ Re-admitted to READY queue for CPU Burst 2`);
+          return {
+            ...p,
+            state: PROCESS_STATES.READY,
+            burstPhase: 'CPU2',
+            ioRemaining: 0,
+            readyEnterTime: nextTick,
+            queueSeq: globalSequence,
+          };
+        } else {
+          // No CPU Burst 2: Process completed its CPU and I/O work ➔ TERMINATED
+          const completionTime = nextTick;
+          const turnaroundTime = completionTime - p.arrivalTime;
+          const waitingTime = Math.max(0, p.waitingTime);
+          eventLogs.push(
+            `[T+${nextTick}] ${p.name} completed I/O operation (${p.ioDuration || 0}t) (CT: ${completionTime}, TAT: ${turnaroundTime}t, WT: ${waitingTime}t) ➔ TERMINATED`
+          );
+          return {
+            ...p,
+            state: PROCESS_STATES.TERMINATED,
+            remainingBurst: 0,
+            burstPhase: 'DONE',
+            ioRemaining: 0,
+            completionTime,
+            turnaroundTime: Math.max(0, turnaroundTime),
+            waitingTime,
+          };
+        }
       }
       return {
         ...p,
@@ -258,8 +289,21 @@ export function executeStep(processes, clockTick, algorithm, timeQuantum = 2, ga
   // 6. Execute 1 CPU cycle on RUNNING process during interval [T, T+1]
   if (runningIndex !== -1) {
     let running = newProcesses[runningIndex];
-    const newRemaining = running.remainingBurst - 1;
+    const b1 = running.cpuBurst1 !== undefined ? running.cpuBurst1 : (running.totalBurst || 4);
+    const b2 = running.cpuBurst2 !== undefined ? running.cpuBurst2 : 0;
+    const ioDur = running.ioDuration || 0;
+    let currentPhase = running.burstPhase || 'CPU1';
+    let newExecuted1 = running.executedBurst1 || 0;
+    let newExecuted2 = running.executedBurst2 || 0;
+
+    if (currentPhase === 'CPU1') {
+      newExecuted1 += 1;
+    } else {
+      newExecuted2 += 1;
+    }
+
     const newExecuted = running.executedBurst + 1;
+    const newRemaining = Math.max(0, (b1 + b2) - newExecuted);
     const newQuantum = running.quantumUsed + 1;
 
     // Advance Program Counter & Registers
@@ -276,11 +320,43 @@ export function executeStep(processes, clockTick, algorithm, timeQuantum = 2, ga
       palette: running.palette,
     });
 
-    if (newRemaining <= 0) {
+    if (currentPhase === 'CPU1' && newExecuted1 >= b1 && ioDur > 0) {
+      // Process completed CPU Burst 1, requests I/O operation at nextTick ➔ moves to WAITING
+      eventLogs.push(
+        `[T+${nextTick}] ${running.name} completed CPU Burst 1 (${b1}t), requested I/O (${ioDur}t) ➔ WAITING`
+      );
+
+      newProcesses[runningIndex] = {
+        ...running,
+        state: PROCESS_STATES.WAITING,
+        remainingBurst: b2,
+        executedBurst: newExecuted,
+        executedBurst1: newExecuted1,
+        executedBurst2: newExecuted2,
+        burstPhase: 'IO',
+        ioRemaining: ioDur,
+        quantumUsed: 0,
+        pc: nextPC,
+        r0: nextR0,
+      };
+    } else if (currentPhase === 'CPU1' && newExecuted1 >= b1 && ioDur === 0 && b2 > 0) {
+      // No I/O configured, directly progresses to CPU Burst 2
+      newProcesses[runningIndex] = {
+        ...running,
+        remainingBurst: newRemaining,
+        executedBurst: newExecuted,
+        executedBurst1: newExecuted1,
+        executedBurst2: newExecuted2,
+        burstPhase: 'CPU2',
+        quantumUsed: newQuantum,
+        pc: nextPC,
+        r0: nextR0,
+      };
+    } else if (newRemaining <= 0) {
       // Process complete at nextTick
       const completionTime = nextTick;
       const turnaroundTime = completionTime - running.arrivalTime;
-      const waitingTime = turnaroundTime - running.totalBurst;
+      const waitingTime = Math.max(0, turnaroundTime - running.totalBurst - (running.ioDuration || 0));
 
       eventLogs.push(
         `[T+${nextTick}] ${running.name} completed (CT: ${completionTime}, TAT: ${turnaroundTime}t, WT: ${waitingTime}t) ➔ TERMINATED`
@@ -291,26 +367,12 @@ export function executeStep(processes, clockTick, algorithm, timeQuantum = 2, ga
         state: PROCESS_STATES.TERMINATED,
         remainingBurst: 0,
         executedBurst: newExecuted,
+        executedBurst1: newExecuted1,
+        executedBurst2: newExecuted2,
+        burstPhase: 'DONE',
         completionTime,
         turnaroundTime: Math.max(0, turnaroundTime),
         waitingTime: Math.max(0, waitingTime),
-        pc: nextPC,
-        r0: nextR0,
-      };
-    } else if (running.ioAfter > 0 && newExecuted >= running.ioAfter && running.ioDuration > 0) {
-      // Process requests I/O operation at nextTick ➔ moves to WAITING
-      eventLogs.push(
-        `[T+${nextTick}] ${running.name} executed ${newExecuted}t CPU burst, requested I/O (${running.ioDuration}t) ➔ WAITING`
-      );
-
-      newProcesses[runningIndex] = {
-        ...running,
-        state: PROCESS_STATES.WAITING,
-        remainingBurst: newRemaining,
-        executedBurst: newExecuted,
-        ioRemaining: running.ioDuration,
-        ioAfter: 0, // Reset I/O trigger after firing
-        quantumUsed: 0,
         pc: nextPC,
         r0: nextR0,
       };
@@ -319,6 +381,9 @@ export function executeStep(processes, clockTick, algorithm, timeQuantum = 2, ga
         ...running,
         remainingBurst: newRemaining,
         executedBurst: newExecuted,
+        executedBurst1: newExecuted1,
+        executedBurst2: newExecuted2,
+        burstPhase: currentPhase,
         quantumUsed: newQuantum,
         pc: nextPC,
         r0: nextR0,
@@ -404,7 +469,7 @@ export function manualTransition(processes, pid, targetState, clockTick) {
   if (targetState === PROCESS_STATES.TERMINATED) {
     newProc.completionTime = clockTick;
     newProc.turnaroundTime = Math.max(0, clockTick - proc.arrivalTime);
-    newProc.waitingTime = Math.max(0, newProc.turnaroundTime - proc.totalBurst);
+    newProc.waitingTime = Math.max(0, newProc.turnaroundTime - proc.totalBurst - (proc.ioDuration || 0));
   }
 
   updated[pIndex] = newProc;

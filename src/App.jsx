@@ -30,14 +30,41 @@ export default function App() {
   // Single step execution (forward 1 tick)
   const handleStep = useCallback(() => {
     setProcesses((prev) => {
+      // Guard against empty process list
+      if (prev.length === 0) {
+        setIsRunning(false);
+        setEventLogs((logs) => {
+          if (logs[0]?.includes('No processes')) return logs;
+          return [`[T+${clockTick}] No processes to schedule. Add a process below to start simulation.`, ...logs].slice(0, 50);
+        });
+        return prev;
+      }
+
+      // Guard against stepping when all processes are already terminated
+      if (prev.every((p) => p.state === PROCESS_STATES.TERMINATED)) {
+        setIsRunning(false);
+        setEventLogs((logs) => {
+          if (logs[0]?.includes('Simulation finished')) return logs;
+          return [`[T+${clockTick}] Simulation finished: All processes have terminated. Click "Final Report" to view metrics.`, ...logs].slice(0, 50);
+        });
+        return prev;
+      }
+
       // Ensure all processes have valid numbers before executing step
-      const sanitized = prev.map((p) => ({
-        ...p,
-        priority: p.priority === '' || isNaN(Number(p.priority)) ? 0 : Number(p.priority),
-        arrivalTime: p.arrivalTime === '' || isNaN(Number(p.arrivalTime)) ? 0 : Number(p.arrivalTime),
-        totalBurst: p.totalBurst === '' || isNaN(Number(p.totalBurst)) || Number(p.totalBurst) < 1 ? 1 : Number(p.totalBurst),
-        remainingBurst: p.remainingBurst === '' || isNaN(Number(p.remainingBurst)) ? (Number(p.totalBurst) || 1) : Number(p.remainingBurst),
-      }));
+      const sanitized = prev.map((p) => {
+        const b1 = p.cpuBurst1 === '' || isNaN(Number(p.cpuBurst1)) || Number(p.cpuBurst1) < 1 ? (Number(p.totalBurst) || 4) : Number(p.cpuBurst1);
+        const b2 = p.cpuBurst2 === '' || isNaN(Number(p.cpuBurst2)) ? 0 : Number(p.cpuBurst2);
+        const total = b1 + b2;
+        return {
+          ...p,
+          priority: p.priority === '' || isNaN(Number(p.priority)) ? 0 : Number(p.priority),
+          arrivalTime: p.arrivalTime === '' || isNaN(Number(p.arrivalTime)) ? 0 : Number(p.arrivalTime),
+          cpuBurst1: b1,
+          cpuBurst2: b2,
+          totalBurst: total,
+          remainingBurst: p.remainingBurst === '' || isNaN(Number(p.remainingBurst)) ? total : Number(p.remainingBurst),
+        };
+      });
 
       // Push historical snapshot of state before this tick
       setHistoryStack((history) => [
@@ -111,20 +138,30 @@ export default function App() {
     resetEngineSequence();
     setHistoryStack([]);
     setProcesses((prev) =>
-      prev.map((p) => ({
-        ...p,
-        state: PROCESS_STATES.NEW,
-        remainingBurst: p.totalBurst,
-        executedBurst: 0,
-        startTime: null,
-        completionTime: null,
-        turnaroundTime: null,
-        waitingTime: 0,
-        responseTime: null,
-        quantumUsed: 0,
-        readyEnterTime: Number(p.arrivalTime) || 0,
-        queueSeq: Number(p.pid) || 0,
-      }))
+      prev.map((p) => {
+        const b1 = p.cpuBurst1 !== undefined ? Number(p.cpuBurst1) : (Number(p.totalBurst) || 4);
+        const b2 = Number(p.cpuBurst2) || 0;
+        const total = b1 + b2;
+        return {
+          ...p,
+          state: PROCESS_STATES.NEW,
+          totalBurst: total,
+          remainingBurst: total,
+          executedBurst: 0,
+          executedBurst1: 0,
+          executedBurst2: 0,
+          burstPhase: 'CPU1',
+          startTime: null,
+          completionTime: null,
+          turnaroundTime: null,
+          waitingTime: 0,
+          responseTime: null,
+          quantumUsed: 0,
+          ioRemaining: 0,
+          readyEnterTime: Number(p.arrivalTime) || 0,
+          queueSeq: Number(p.pid) || 0,
+        };
+      })
     );
     setClockTick(0);
     setGanttHistory([]);
@@ -142,24 +179,26 @@ export default function App() {
   const handleQuickAddProcess = (data) => {
     setProcesses((prev) => {
       const calcPid = prev.length > 0 ? Math.max(...prev.map((p) => Number(p.pid) || 0)) + 1 : 1;
-      const totalBurst = data.totalBurst !== undefined ? data.totalBurst : 4;
-      const ioDuration = data.ioDuration !== undefined ? data.ioDuration : 0;
-      const ioAfter = ioDuration > 0 ? Math.max(1, Math.floor(totalBurst / 2)) : 0;
+      const cpuBurst1 = data.cpuBurst1 !== undefined ? Math.max(1, Number(data.cpuBurst1)) : 4;
+      const ioDuration = data.ioDuration !== undefined ? Math.max(0, Number(data.ioDuration)) : 0;
+      const cpuBurst2 = data.cpuBurst2 !== undefined ? Math.max(0, Number(data.cpuBurst2)) : 0;
+      const totalBurst = cpuBurst1 + cpuBurst2;
 
       const newProc = createProcess({
         pid: calcPid,
         name: data.name || `P${calcPid}`,
         priority: data.priority !== undefined ? data.priority : 1,
         arrivalTime: data.arrivalTime !== undefined ? data.arrivalTime : 0,
+        cpuBurst1,
+        ioDuration,
+        cpuBurst2,
         totalBurst,
         memoryMB: data.memoryMB || 32,
-        ioAfter,
-        ioDuration,
       });
 
       setSelectedPid(calcPid);
       setEventLogs((logs) => [
-        `[T+${clockTick}] Added ${newProc.name} (AT: ${newProc.arrivalTime}, BT: ${newProc.totalBurst}t, IO: ${newProc.ioDuration}t, Priority: ${newProc.priority})`,
+        `[T+${clockTick}] Added ${newProc.name} (AT: ${newProc.arrivalTime}, BT1: ${newProc.cpuBurst1}t, IO: ${newProc.ioDuration}t, BT2: ${newProc.cpuBurst2}t, Priority: ${newProc.priority})`,
         ...logs,
       ].slice(0, 50));
 
@@ -207,7 +246,7 @@ export default function App() {
     }
   };
 
-  // Inline update process fields (Priority, AT, BT, IO Burst, Name) directly from table
+  // Inline update process fields (Priority, AT, BT1, IO, BT2, Name) directly from table
   const handleUpdateProcess = (pid, field, rawValue) => {
     setProcesses((prev) =>
       prev.map((p) => {
@@ -233,16 +272,34 @@ export default function App() {
               updated.readyEnterTime = val;
             }
           }
-        } else if (field === 'totalBurst') {
+        } else if (field === 'cpuBurst1' || field === 'totalBurst') {
           if (rawValue === '') {
-            updated.totalBurst = '';
+            updated.cpuBurst1 = '';
           } else {
             const val = Math.max(1, parseInt(rawValue, 10) || 1);
-            updated.totalBurst = val;
+            updated.cpuBurst1 = val;
+            const b2 = Number(updated.cpuBurst2) || 0;
+            const total = val + b2;
+            updated.totalBurst = total;
             if (!updated.executedBurst || updated.state === PROCESS_STATES.NEW) {
-              updated.remainingBurst = val;
+              updated.remainingBurst = total;
             } else {
-              updated.remainingBurst = Math.max(0, val - (updated.executedBurst || 0));
+              updated.remainingBurst = Math.max(0, total - (updated.executedBurst || 0));
+            }
+          }
+        } else if (field === 'cpuBurst2') {
+          if (rawValue === '') {
+            updated.cpuBurst2 = '';
+          } else {
+            const val = Math.max(0, parseInt(rawValue, 10) || 0);
+            updated.cpuBurst2 = val;
+            const b1 = Number(updated.cpuBurst1) || Number(updated.totalBurst) || 4;
+            const total = b1 + val;
+            updated.totalBurst = total;
+            if (!updated.executedBurst || updated.state === PROCESS_STATES.NEW) {
+              updated.remainingBurst = total;
+            } else {
+              updated.remainingBurst = Math.max(0, total - (updated.executedBurst || 0));
             }
           }
         } else if (field === 'ioDuration') {
@@ -251,7 +308,6 @@ export default function App() {
           } else {
             const val = Math.max(0, parseInt(rawValue, 10) || 0);
             updated.ioDuration = val;
-            updated.ioAfter = val > 0 ? Math.max(1, Math.floor(Number(updated.totalBurst || 4) / 2)) : 0;
             if (updated.state === PROCESS_STATES.WAITING) {
               updated.ioRemaining = val;
             }
@@ -281,19 +337,31 @@ export default function App() {
               updated.readyEnterTime = 0;
             }
           }
-        } else if (field === 'totalBurst') {
-          if (updated.totalBurst === '' || isNaN(Number(updated.totalBurst)) || Number(updated.totalBurst) < 1) {
-            updated.totalBurst = 1;
+        } else if (field === 'cpuBurst1' || field === 'totalBurst') {
+          if (updated.cpuBurst1 === '' || isNaN(Number(updated.cpuBurst1)) || Number(updated.cpuBurst1) < 1) {
+            updated.cpuBurst1 = 4;
+            const total = 4 + (Number(updated.cpuBurst2) || 0);
+            updated.totalBurst = total;
             if (!updated.executedBurst || updated.state === PROCESS_STATES.NEW) {
-              updated.remainingBurst = 1;
+              updated.remainingBurst = total;
             } else {
-              updated.remainingBurst = Math.max(0, 1 - (updated.executedBurst || 0));
+              updated.remainingBurst = Math.max(0, total - (updated.executedBurst || 0));
+            }
+          }
+        } else if (field === 'cpuBurst2') {
+          if (updated.cpuBurst2 === '' || isNaN(Number(updated.cpuBurst2))) {
+            updated.cpuBurst2 = 0;
+            const total = (Number(updated.cpuBurst1) || 4);
+            updated.totalBurst = total;
+            if (!updated.executedBurst || updated.state === PROCESS_STATES.NEW) {
+              updated.remainingBurst = total;
+            } else {
+              updated.remainingBurst = Math.max(0, total - (updated.executedBurst || 0));
             }
           }
         } else if (field === 'ioDuration') {
           if (updated.ioDuration === '' || isNaN(Number(updated.ioDuration))) {
             updated.ioDuration = 0;
-            updated.ioAfter = 0;
           }
         } else if (field === 'name') {
           if (!updated.name || !updated.name.trim()) {
@@ -311,7 +379,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      
+
       {/* 1. Header & Controls */}
       <Navbar
         clockTick={clockTick}
@@ -331,12 +399,13 @@ export default function App() {
 
       {/* 2. Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 flex flex-col gap-5">
-        
+
         {/* Main 5-State Lifecycle Diagram */}
         <LifecycleView
           processes={processes}
           selectedPid={selectedPid}
           onSelectPid={setSelectedPid}
+          algorithm={algorithm}
         />
 
         {/* Simple Execution Gantt Chart */}
@@ -347,7 +416,7 @@ export default function App() {
 
         {/* 2-Column Split: Active Process Table + Selected PCB Inspector */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          
+
           {/* Left: Active Processes Table (7 Cols) */}
           <div className="lg:col-span-7">
             <ProcessTable

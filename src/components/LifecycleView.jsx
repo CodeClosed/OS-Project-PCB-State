@@ -1,12 +1,15 @@
 import React from 'react';
 import { PROCESS_STATES, STATE_COLORS } from '../types/process';
+import { sortReadyQueue } from '../engine/simulationEngine.js';
 
 export default function LifecycleView({
   processes,
   selectedPid,
   onSelectPid,
+  algorithm = 'FCFS',
 }) {
   const getProcsInState = (state) => processes.filter((p) => p.state === state);
+  const readyQueueOrdered = sortReadyQueue(getProcsInState(PROCESS_STATES.READY), algorithm);
 
   return (
     <div className="rounded-xl bg-white border border-slate-200 p-5 font-mono shadow-xs">
@@ -15,7 +18,7 @@ export default function LifecycleView({
         <div>
           <h2 className="text-sm font-bold text-slate-900 font-sans">Process Lifecycle Diagram</h2>
           <p className="text-xs text-slate-500">
-            Active scheduler manages discrete transitions between 5 OS states
+            Active scheduler ({algorithm}) manages discrete transitions between 5 OS states
           </p>
         </div>
       </div>
@@ -50,43 +53,63 @@ export default function LifecycleView({
                     <span className="font-bold text-slate-900">{p.name}</span>
                     <span className="text-[10px] text-slate-500">P:{p.priority}</span>
                   </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">Burst: {p.totalBurst}t</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    {p.cpuBurst2 > 0 ? `BT1: ${p.cpuBurst1}t | BT2: ${p.cpuBurst2}t` : `Burst: ${p.totalBurst}t`}
+                  </div>
                 </div>
               ))
             )}
           </div>
         </div>
 
-        {/* 2. READY QUEUE */}
+        {/* 2. READY QUEUE (Sorted by active scheduler, top is NEXT to be dispatched) */}
         <div className={`rounded-xl border ${STATE_COLORS.READY.border} ${STATE_COLORS.READY.bg} p-3.5 flex flex-col gap-2 min-h-[140px] shadow-xs`}>
           <div className="flex items-center justify-between font-bold border-b border-cyan-200/80 pb-1.5">
-            <span className={STATE_COLORS.READY.text}>2. READY</span>
+            <div className="flex items-center gap-1">
+              <span className={STATE_COLORS.READY.text}>2. READY</span>
+              <span className="text-[9px] text-cyan-600 font-normal">({algorithm})</span>
+            </div>
             <span className="text-[10px] text-cyan-700 bg-white px-2 py-0.5 rounded border border-cyan-200 font-bold">
-              {getProcsInState(PROCESS_STATES.READY).length}
+              {readyQueueOrdered.length}
             </span>
           </div>
 
           <div className="flex flex-col gap-2">
-            {getProcsInState(PROCESS_STATES.READY).length === 0 ? (
+            {readyQueueOrdered.length === 0 ? (
               <span className="text-[11px] text-slate-400 italic py-4 text-center">Empty</span>
             ) : (
-              getProcsInState(PROCESS_STATES.READY).map((p, idx) => (
-                <div
-                  key={p.pid}
-                  onClick={() => onSelectPid(p.pid)}
-                  className={`p-2.5 rounded-lg border transition-all cursor-pointer ${
-                    selectedPid === p.pid
-                      ? 'bg-cyan-100 border-cyan-500 text-cyan-900 shadow-xs'
-                      : 'bg-white border-slate-200 text-slate-800 hover:border-cyan-400 hover:bg-cyan-50/50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900">#{idx + 1} {p.name}</span>
-                    <span className="text-[10px] text-slate-500">P:{p.priority}</span>
+              readyQueueOrdered.map((p, idx) => {
+                const isNext = idx === 0;
+                return (
+                  <div
+                    key={p.pid}
+                    onClick={() => onSelectPid(p.pid)}
+                    className={`p-2.5 rounded-lg border transition-all cursor-pointer ${
+                      selectedPid === p.pid
+                        ? 'bg-cyan-100 border-cyan-500 text-cyan-900 shadow-xs ring-1 ring-cyan-400'
+                        : isNext
+                        ? 'bg-white border-emerald-400 text-slate-800 shadow-xs ring-1 ring-emerald-300'
+                        : 'bg-white border-slate-200 text-slate-800 hover:border-cyan-400 hover:bg-cyan-50/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-slate-900">#{idx + 1} {p.name}</span>
+                        {isNext && (
+                          <span className="text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold px-1.5 py-0.2 rounded shadow-2xs">
+                            NEXT
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-500">P:{p.priority}</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-0.5 flex items-center justify-between">
+                      <span>Left: {p.remainingBurst}t {p.cpuBurst2 > 0 ? `(${p.burstPhase || 'CPU1'})` : ''}</span>
+                      <span className="text-[9px] text-slate-400">AT:{p.arrivalTime}</span>
+                    </div>
                   </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">Left: {p.remainingBurst}t</div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -116,7 +139,9 @@ export default function LifecycleView({
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-emerald-900">{p.name}</span>
-                    <span className="text-[10px] text-emerald-700 font-bold">{p.remainingBurst}t left</span>
+                    <span className="text-[10px] text-emerald-700 font-bold">
+                      {p.remainingBurst}t left {p.cpuBurst2 > 0 ? `(${p.burstPhase || 'CPU1'})` : ''}
+                    </span>
                   </div>
 
                   {/* Progress bar */}
