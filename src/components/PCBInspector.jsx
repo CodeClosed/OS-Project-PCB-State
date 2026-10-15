@@ -1,8 +1,8 @@
 import React from 'react';
-import { Terminal } from 'lucide-react';
+import { Terminal, Info } from 'lucide-react';
 import { STATE_COLORS } from '../types/process';
 
-export default function PCBInspector({ process }) {
+export default function PCBInspector({ process, onOpenLifecycleModal }) {
   if (!process) {
     return (
       <div className="rounded-xl bg-white border border-slate-200 p-5 flex flex-col items-center justify-center text-center h-full min-h-[220px] font-mono text-xs text-slate-400 shadow-xs">
@@ -23,9 +23,15 @@ export default function PCBInspector({ process }) {
           <h3 className="text-sm font-bold text-slate-900 font-sans">{process.name}</h3>
           <span className="text-[11px] text-slate-500 font-medium">Process Control Block (PID: #{process.pid})</span>
         </div>
-        <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] border ${badgeStyle}`}>
-          {process.state}
-        </span>
+        <button
+          type="button"
+          onClick={() => onOpenLifecycleModal && onOpenLifecycleModal(process.pid)}
+          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[10px] border transition-transform hover:scale-105 cursor-pointer ${badgeStyle}`}
+          title="Click to view Process Lifecycle Diagram for this process (i)"
+        >
+          <span>{process.state}</span>
+          <Info className="w-2.5 h-2.5 opacity-75" />
+        </button>
       </div>
 
       {/* PCB Data Grid */}

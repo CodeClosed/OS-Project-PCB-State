@@ -7,6 +7,7 @@ import GanttChart from './components/GanttChart';
 import EventTimeline from './components/EventTimeline';
 import NewProcessModal from './components/NewProcessModal';
 import FinalReportModal from './components/FinalReportModal';
+import LifecycleModal from './components/LifecycleModal';
 import { INITIAL_PROCESSES, PROCESS_STATES, createProcess } from './types/process';
 import { executeStep, resetEngineSequence } from './engine/simulationEngine';
 
@@ -19,6 +20,7 @@ export default function App() {
   const [selectedPid, setSelectedPid] = useState(1);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isLifecycleModalOpen, setIsLifecycleModalOpen] = useState(false);
   const [ganttHistory, setGanttHistory] = useState([]);
   const [historyStack, setHistoryStack] = useState([]);
   const [eventLogs, setEventLogs] = useState([
@@ -377,6 +379,12 @@ export default function App() {
   const selectedProcess = processes.find((p) => p.pid === selectedPid) || null;
   const nextPid = processes.length > 0 ? Math.max(...processes.map((p) => Number(p.pid) || 0)) + 1 : 1;
 
+  // Open Process Lifecycle Diagram & State Explanation Modal
+  const handleOpenLifecycleModal = (pid) => {
+    if (pid) setSelectedPid(pid);
+    setIsLifecycleModalOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
 
@@ -400,12 +408,13 @@ export default function App() {
       {/* 2. Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 flex flex-col gap-5">
 
-        {/* Main 5-State Lifecycle Diagram */}
+        {/* Compact Process Lifecycle Diagram Bar (with pop-up modal) */}
         <LifecycleView
           processes={processes}
           selectedPid={selectedPid}
           onSelectPid={setSelectedPid}
           algorithm={algorithm}
+          onOpenModal={() => setIsLifecycleModalOpen(true)}
         />
 
         {/* Simple Execution Gantt Chart */}
@@ -423,6 +432,7 @@ export default function App() {
               processes={processes}
               selectedPid={selectedPid}
               onSelectPid={setSelectedPid}
+              onOpenLifecycleModal={handleOpenLifecycleModal}
               onDeleteProcess={handleDeleteProcess}
               onQuickAddProcess={handleQuickAddProcess}
               onUpdateProcess={handleUpdateProcess}
@@ -436,7 +446,10 @@ export default function App() {
 
           {/* Right: Focused PCB Inspector (5 Cols) */}
           <div className="lg:col-span-5">
-            <PCBInspector process={selectedProcess} />
+            <PCBInspector
+              process={selectedProcess}
+              onOpenLifecycleModal={handleOpenLifecycleModal}
+            />
           </div>
 
         </div>
@@ -465,6 +478,17 @@ export default function App() {
         processes={processes}
         clockTick={clockTick}
         algorithm={algorithm}
+      />
+
+      {/* Process Lifecycle 5-State Pop-up Modal */}
+      <LifecycleModal
+        isOpen={isLifecycleModalOpen}
+        onClose={() => setIsLifecycleModalOpen(false)}
+        processes={processes}
+        selectedPid={selectedPid}
+        onSelectPid={setSelectedPid}
+        algorithm={algorithm}
+        clockTick={clockTick}
       />
 
     </div>
