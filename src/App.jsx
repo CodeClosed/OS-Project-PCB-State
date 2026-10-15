@@ -35,7 +35,7 @@ export default function App() {
         setIsRunning(false);
         setEventLogs((logs) => {
           if (logs[0]?.includes('No processes')) return logs;
-          return [`[T+${clockTick}] No processes to schedule. Add a process below to start simulation.`, ...logs].slice(0, 50);
+          return [`[T+${clockTick}] No processes to schedule. Add a process below to start simulation.`, ...logs].slice(0, 1000);
         });
         return prev;
       }
@@ -45,7 +45,7 @@ export default function App() {
         setIsRunning(false);
         setEventLogs((logs) => {
           if (logs[0]?.includes('Simulation finished')) return logs;
-          return [`[T+${clockTick}] Simulation finished: All processes have terminated. Click "Final Report" to view metrics.`, ...logs].slice(0, 50);
+          return [`[T+${clockTick}] Simulation finished: All processes have terminated. Click "Final Report" to view metrics.`, ...logs].slice(0, 1000);
         });
         return prev;
       }
@@ -83,7 +83,7 @@ export default function App() {
       setGanttHistory(result.ganttHistory);
 
       if (result.eventLogs.length > 0) {
-        setEventLogs((logs) => [...result.eventLogs, ...logs].slice(0, 50));
+        setEventLogs((logs) => [...result.eventLogs, ...logs].slice(0, 1000));
       }
 
       // If all terminated, pause simulation
@@ -200,7 +200,7 @@ export default function App() {
       setEventLogs((logs) => [
         `[T+${clockTick}] Added ${newProc.name} (AT: ${newProc.arrivalTime}, BT1: ${newProc.cpuBurst1}t, IO: ${newProc.ioDuration}t, BT2: ${newProc.cpuBurst2}t, Priority: ${newProc.priority})`,
         ...logs,
-      ].slice(0, 50));
+      ].slice(0, 1000));
 
       return [...prev, newProc];
     });
@@ -239,7 +239,7 @@ export default function App() {
     const updated = processes.filter((p) => p.pid !== pid);
     setProcesses(updated);
     if (target) {
-      setEventLogs((prev) => [`[T+${clockTick}] Deleted ${target.name} (PID: #${pid}) from list`, ...prev].slice(0, 50));
+      setEventLogs((prev) => [`[T+${clockTick}] Deleted ${target.name} (PID: #${pid}) from list`, ...prev].slice(0, 1000));
     }
     if (selectedPid === pid) {
       setSelectedPid(updated[0]?.pid || null);
