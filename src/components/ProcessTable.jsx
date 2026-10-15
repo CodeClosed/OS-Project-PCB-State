@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { STATE_COLORS, createProcess } from '../types/process';
-import { Eye, Info, Trash2, Plus, Upload, Download, FileSpreadsheet } from 'lucide-react';
+import { Eye, Trash2, Plus, Upload, Download, FileSpreadsheet } from 'lucide-react';
 
 export default function ProcessTable({
   processes = [],
   selectedPid,
   onSelectPid,
-  onOpenLifecycleModal,
   onDeleteProcess,
   onQuickAddProcess,
   onUpdateProcess,
@@ -448,22 +447,9 @@ export default function ProcessTable({
 
                     {/* State Badge */}
                     <td className="py-2 px-2.5">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onOpenLifecycleModal) {
-                            onOpenLifecycleModal(p.pid);
-                          } else {
-                            onSelectPid(p.pid);
-                          }
-                        }}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border transition-transform hover:scale-105 cursor-pointer ${badge}`}
-                        title={`Click to view lifecycle diagram for ${p.name} (i)`}
-                      >
-                        <span>{p.state}</span>
-                        <Info className="w-2.5 h-2.5 opacity-70" />
-                      </button>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${badge}`}>
+                        {p.state}
+                      </span>
                     </td>
 
                     {/* Editable Priority */}
@@ -627,17 +613,11 @@ export default function ProcessTable({
                       <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (onOpenLifecycleModal) {
-                              onOpenLifecycleModal(p.pid);
-                            } else {
-                              onSelectPid(p.pid);
-                            }
-                          }}
-                          className="p-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 transition-colors cursor-pointer"
-                          title="View Process Lifecycle State Diagram (i)"
+                          onClick={() => onSelectPid(p.pid)}
+                          className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-blue-600 transition-colors cursor-pointer"
+                          title="Inspect PCB"
                         >
-                          <Info className="w-3.5 h-3.5" />
+                          <Eye className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
