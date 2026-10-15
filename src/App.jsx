@@ -7,29 +7,22 @@ import GanttChart from './components/GanttChart';
 import EventTimeline from './components/EventTimeline';
 import NewProcessModal from './components/NewProcessModal';
 import FinalReportModal from './components/FinalReportModal';
-
-// Features
-import BattleArena from './components/BattleArena';
-import LiveProcessDashboard from './components/LiveProcessDashboard';
-
 import { INITIAL_PROCESSES, PROCESS_STATES, createProcess } from './types/process';
 import { executeStep, resetEngineSequence } from './engine/simulationEngine';
 
 export default function App() {
-  const [activeModule, setActiveModule] = useState('SIMULATOR');
-  // Starts completely clear (0 processes loaded)
   const [processes, setProcesses] = useState(INITIAL_PROCESSES);
   const [clockTick, setClockTick] = useState(0);
   const [algorithm, setAlgorithm] = useState('FCFS');
   const [timeQuantum, setTimeQuantum] = useState(2);
   const [isRunning, setIsRunning] = useState(false);
-  const [selectedPid, setSelectedPid] = useState(null);
+  const [selectedPid, setSelectedPid] = useState(1);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [ganttHistory, setGanttHistory] = useState([]);
   const [historyStack, setHistoryStack] = useState([]);
   const [eventLogs, setEventLogs] = useState([
-    '[T+0] Simulator initialized. Add processes below or import CSV to start.'
+    '[T+0] Simulator initialized with 4 processes.'
   ]);
 
   const timerRef = useRef(null);
@@ -105,153 +98,220 @@ export default function App() {
 
   // Step back 1 clock tick
   const handleStepBack = useCallback(() => {
-    if (historyStack.length === 0 || clockTick === 0) return;
-
+    if (isRunning) {
+      setIsRunning(false);
+    }
     setHistoryStack((prevHistory) => {
-      const nextHistory = [...prevHistory];
-      const previousState = nextHistory.pop();
+      if (prevHistory.length === 0) return prevHistory;
+      const lastSnapshot = prevHistory[prevHistory.length - 1];
+      const newHistory = prevHistory.slice(0, prevHistory.length - 1);
 
-      if (previousState) {
-        setProcesses(previousState.processes);
-        setClockTick(previousState.clockTick);
-        setGanttHistory(previousState.ganttHistory);
-        setEventLogs(previousState.eventLogs);
-        setSelectedPid(previousState.selectedPid);
+      setProcesses(lastSnapshot.processes);
+      setClockTick(lastSnapshot.clockTick);
+      setGanttHistory(lastSnapshot.ganttHistory);
+      setEventLogs(lastSnapshot.eventLogs);
+      if (lastSnapshot.selectedPid) {
+        setSelectedPid(lastSnapshot.selectedPid);
       }
 
-      return nextHistory;
+      return newHistory;
     });
-  }, [historyStack, clockTick]);
+  }, [isRunning]);
 
-  // Reset simulator to completely clean/empty state
-  const handleReset = useCallback(() => {
-    setIsRunning(false);
-    setClockTick(0);
-    resetEngineSequence();
-    setProcesses([]);
-    setGanttHistory([]);
-    setHistoryStack([]);
-    setEventLogs(['[T+0] Simulator reset. All processes cleared.']);
-    setSelectedPid(null);
-  }, []);
-
-  // Timer interval for play/pause
+  // Play / Pause timer loop
   useEffect(() => {
     if (isRunning) {
       timerRef.current = setInterval(() => {
         handleStep();
       }, 1000);
-    } else if (timerRef.current) {
-      clearInterval(timerRef.current);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
     }
-
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [isRunning, handleStep]);
 
-  // Create new process from modal (strictly created in NEW state)
-  const handleCreateProcess = (procData) => {
-    const newProc = createProcess(procData);
-    newProc.state = PROCESS_STATES.NEW;
-    setProcesses((prev) => [...prev, newProc]);
-    setEventLogs((logs) => [
-      `[T+${clockTick}] Created process ${newProc.name} (PID ${newProc.pid}) with AT: ${newProc.arrivalTime}, Burst: ${newProc.totalBurst}, Priority: ${newProc.priority}.`,
-      ...logs,
-    ].slice(0, 50));
-    setSelectedPid(newProc.pid);
-  };
-
-  // Quick add process from table (strictly created in NEW state)
-  const handleQuickAddProcess = (procData) => {
-    const newProc = createProcess(procData);
-    newProc.state = PROCESS_STATES.NEW;
-    setProcesses((prev) => [...prev, newProc]);
-    setEventLogs((logs) => [
-      `[T+${clockTick}] Added process ${newProc.name} (PID ${newProc.pid}) to pool.`,
-      ...logs,
-    ].slice(0, 50));
-    setSelectedPid(newProc.pid);
-  };
-
-  // Delete process
-  const handleDeleteProcess = (pid) => {
-    setProcesses((prev) => {
-      const remaining = prev.filter((p) => p.pid !== pid);
-      if (selectedPid === pid) {
-        setSelectedPid(remaining[0]?.pid || null);
-      }
-      return remaining;
-    });
-    setEventLogs((logs) => [`[T+${clockTick}] Deleted process PID ${pid}.`, ...logs].slice(0, 50));
-  };
-
-  // Clear all processes
-  const handleClearAll = () => {
+  // Reset simulator (Resets all existing processes to NEW state without wiping custom rows)
+  const handleReset = () => {
     setIsRunning(false);
+    resetEngineSequence();
+    setHistoryStack([]);
+    setProcesses((prev) =>
+      prev.map((p) => {
+        const b1 = p.cpuBurst1 !== undefined ? Number(p.cpuBurst1) : (Number(p.totalBurst) || 4);
+        const b2 = Number(p.cpuBurst2) || 0;
+        const total = b1 + b2;
+        return {
+          ...p,
+          state: PROCESS_STATES.NEW,
+          totalBurst: total,
+          remainingBurst: total,
+          executedBurst: 0,
+          executedBurst1: 0,
+          executedBurst2: 0,
+          burstPhase: 'CPU1',
+          startTime: null,
+          completionTime: null,
+          turnaroundTime: null,
+          waitingTime: 0,
+          responseTime: null,
+          quantumUsed: 0,
+          ioRemaining: 0,
+          readyEnterTime: Number(p.arrivalTime) || 0,
+          queueSeq: Number(p.pid) || 0,
+        };
+      })
+    );
+    setClockTick(0);
+    setGanttHistory([]);
+    setEventLogs(['[T+0] Simulator reset to T=0. All processes returned to NEW state.']);
+  };
+
+  // Create new process via modal
+  const handleCreateProcess = (newProc) => {
+    setProcesses((prev) => [...prev, newProc]);
+    setEventLogs((prev) => [`[T+${clockTick}] Created process ${newProc.name} (AT: ${newProc.arrivalTime})`, ...prev]);
+    setSelectedPid(newProc.pid);
+  };
+
+  // Quick Add Process from inline table row
+  const handleQuickAddProcess = (data) => {
+    setProcesses((prev) => {
+      const calcPid = prev.length > 0 ? Math.max(...prev.map((p) => Number(p.pid) || 0)) + 1 : 1;
+      const cpuBurst1 = data.cpuBurst1 !== undefined ? Math.max(1, Number(data.cpuBurst1)) : 4;
+      const ioDuration = data.ioDuration !== undefined ? Math.max(0, Number(data.ioDuration)) : 0;
+      const cpuBurst2 = data.cpuBurst2 !== undefined ? Math.max(0, Number(data.cpuBurst2)) : 0;
+      const totalBurst = cpuBurst1 + cpuBurst2;
+
+      const newProc = createProcess({
+        pid: calcPid,
+        name: data.name || `P${calcPid}`,
+        priority: data.priority !== undefined ? data.priority : 1,
+        arrivalTime: data.arrivalTime !== undefined ? data.arrivalTime : 0,
+        cpuBurst1,
+        ioDuration,
+        cpuBurst2,
+        totalBurst,
+        memoryMB: data.memoryMB || 32,
+      });
+
+      setSelectedPid(calcPid);
+      setEventLogs((logs) => [
+        `[T+${clockTick}] Added ${newProc.name} (AT: ${newProc.arrivalTime}, BT1: ${newProc.cpuBurst1}t, IO: ${newProc.ioDuration}t, BT2: ${newProc.cpuBurst2}t, Priority: ${newProc.priority})`,
+        ...logs,
+      ].slice(0, 50));
+
+      return [...prev, newProc];
+    });
+  };
+
+  // Clear all process rows
+  const handleClearAll = () => {
+    resetEngineSequence();
+    setHistoryStack([]);
     setProcesses([]);
     setSelectedPid(null);
-    setEventLogs((logs) => [`[T+${clockTick}] Cleared all processes from simulator.`, ...logs].slice(0, 50));
-  };
-
-  // Import processes from preset or Live OS Monitor (all start in NEW state)
-  const handleImportProcesses = (importedList) => {
-    setIsRunning(false);
-    setClockTick(0);
-    resetEngineSequence();
     setGanttHistory([]);
-    setHistoryStack([]);
-    const formatted = importedList.map((p, idx) => ({
-      ...p,
-      pid: p.pid || idx + 1,
-      name: p.name || `P${idx + 1}`,
-      state: PROCESS_STATES.NEW,
-    }));
-    setProcesses(formatted);
-    setSelectedPid(formatted[0]?.pid || null);
-    setEventLogs([`[T+0] Imported ${formatted.length} processes (all initialized in NEW state).`]);
-    setActiveModule('SIMULATOR');
+    setClockTick(0);
+    setIsRunning(false);
+    setEventLogs(['[T+0] Cleared all process rows. Use "+ Add Row" below or Import CSV to populate your problem.']);
   };
 
-  // Inline update process from table inputs
-  const handleUpdateProcess = (pid, field, value) => {
+  // Direct CSV Import of entire process set
+  const handleImportProcesses = (importedList) => {
+    if (!importedList || importedList.length === 0) return;
+    resetEngineSequence();
+    setHistoryStack([]);
+    setProcesses(importedList);
+    setSelectedPid(importedList[0]?.pid || 1);
+    setGanttHistory([]);
+    setClockTick(0);
+    setIsRunning(false);
+    setEventLogs([
+      `[T+0] Successfully imported ${importedList.length} processes from CSV.`,
+    ]);
+  };
+
+  // Delete / Eliminate process from table
+  const handleDeleteProcess = (pid) => {
+    const target = processes.find((p) => p.pid === pid);
+    const updated = processes.filter((p) => p.pid !== pid);
+    setProcesses(updated);
+    if (target) {
+      setEventLogs((prev) => [`[T+${clockTick}] Deleted ${target.name} (PID: #${pid}) from list`, ...prev].slice(0, 50));
+    }
+    if (selectedPid === pid) {
+      setSelectedPid(updated[0]?.pid || null);
+    }
+  };
+
+  // Inline update process fields (Priority, AT, BT1, IO, BT2, Name) directly from table
+  const handleUpdateProcess = (pid, field, rawValue) => {
     setProcesses((prev) =>
       prev.map((p) => {
         if (p.pid !== pid) return p;
         const updated = { ...p };
 
         if (field === 'name') {
-          updated.name = value;
-        } else if (field === 'arrivalTime') {
-          updated.arrivalTime = value === '' ? '' : Math.max(0, parseInt(value) || 0);
+          updated.name = rawValue;
         } else if (field === 'priority') {
-          updated.priority = value === '' ? '' : Math.max(0, parseInt(value) || 0);
-        } else if (field === 'cpuBurst1') {
-          const b1 = value === '' ? '' : Math.max(1, parseInt(value) || 1);
-          updated.cpuBurst1 = b1;
-          const b2 = updated.cpuBurst2 === '' || isNaN(Number(updated.cpuBurst2)) ? 0 : Number(updated.cpuBurst2);
-          const total = (b1 === '' ? 0 : b1) + b2;
-          updated.totalBurst = total;
-          if (!updated.executedBurst || updated.state === PROCESS_STATES.NEW) {
-            updated.remainingBurst = total;
+          if (rawValue === '') {
+            updated.priority = '';
           } else {
-            updated.remainingBurst = Math.max(0, total - (updated.executedBurst || 0));
+            const val = Math.max(0, parseInt(rawValue, 10) || 0);
+            updated.priority = val;
+          }
+        } else if (field === 'arrivalTime') {
+          if (rawValue === '') {
+            updated.arrivalTime = '';
+          } else {
+            const val = Math.max(0, parseInt(rawValue, 10) || 0);
+            updated.arrivalTime = val;
+            if (updated.state === PROCESS_STATES.NEW) {
+              updated.readyEnterTime = val;
+            }
+          }
+        } else if (field === 'cpuBurst1' || field === 'totalBurst') {
+          if (rawValue === '') {
+            updated.cpuBurst1 = '';
+          } else {
+            const val = Math.max(1, parseInt(rawValue, 10) || 1);
+            updated.cpuBurst1 = val;
+            const b2 = Number(updated.cpuBurst2) || 0;
+            const total = val + b2;
+            updated.totalBurst = total;
+            if (!updated.executedBurst || updated.state === PROCESS_STATES.NEW) {
+              updated.remainingBurst = total;
+            } else {
+              updated.remainingBurst = Math.max(0, total - (updated.executedBurst || 0));
+            }
           }
         } else if (field === 'cpuBurst2') {
-          const b2 = value === '' ? '' : Math.max(0, parseInt(value) || 0);
-          updated.cpuBurst2 = b2;
-          const b1 = updated.cpuBurst1 === '' || isNaN(Number(updated.cpuBurst1)) ? (Number(updated.totalBurst) || 4) : Number(updated.cpuBurst1);
-          const total = b1 + (b2 === '' ? 0 : b2);
-          updated.totalBurst = total;
-          if (!updated.executedBurst || updated.state === PROCESS_STATES.NEW) {
-            updated.remainingBurst = total;
+          if (rawValue === '') {
+            updated.cpuBurst2 = '';
           } else {
-            updated.remainingBurst = Math.max(0, total - (updated.executedBurst || 0));
+            const val = Math.max(0, parseInt(rawValue, 10) || 0);
+            updated.cpuBurst2 = val;
+            const b1 = Number(updated.cpuBurst1) || Number(updated.totalBurst) || 4;
+            const total = b1 + val;
+            updated.totalBurst = total;
+            if (!updated.executedBurst || updated.state === PROCESS_STATES.NEW) {
+              updated.remainingBurst = total;
+            } else {
+              updated.remainingBurst = Math.max(0, total - (updated.executedBurst || 0));
+            }
           }
         } else if (field === 'ioDuration') {
-          updated.ioDuration = value === '' ? '' : Math.max(0, parseInt(value) || 0);
+          if (rawValue === '') {
+            updated.ioDuration = '';
+          } else {
+            const val = Math.max(0, parseInt(rawValue, 10) || 0);
+            updated.ioDuration = val;
+            if (updated.state === PROCESS_STATES.WAITING) {
+              updated.ioRemaining = val;
+            }
+          }
         }
 
         return updated;
@@ -259,22 +319,26 @@ export default function App() {
     );
   };
 
+  // Ensure default valid values on blur if left blank
   const handleBlurProcess = (pid, field) => {
     setProcesses((prev) =>
       prev.map((p) => {
         if (p.pid !== pid) return p;
         const updated = { ...p };
 
-        if (field === 'arrivalTime') {
-          if (updated.arrivalTime === '' || isNaN(Number(updated.arrivalTime))) {
-            updated.arrivalTime = 0;
-          }
-        } else if (field === 'priority') {
+        if (field === 'priority') {
           if (updated.priority === '' || isNaN(Number(updated.priority))) {
             updated.priority = 0;
           }
-        } else if (field === 'cpuBurst1') {
-          if (updated.cpuBurst1 === '' || isNaN(Number(updated.cpuBurst1))) {
+        } else if (field === 'arrivalTime') {
+          if (updated.arrivalTime === '' || isNaN(Number(updated.arrivalTime))) {
+            updated.arrivalTime = 0;
+            if (updated.state === PROCESS_STATES.NEW) {
+              updated.readyEnterTime = 0;
+            }
+          }
+        } else if (field === 'cpuBurst1' || field === 'totalBurst') {
+          if (updated.cpuBurst1 === '' || isNaN(Number(updated.cpuBurst1)) || Number(updated.cpuBurst1) < 1) {
             updated.cpuBurst1 = 4;
             const total = 4 + (Number(updated.cpuBurst2) || 0);
             updated.totalBurst = total;
@@ -315,10 +379,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      {/* 1. Header & Navigation */}
+
+      {/* 1. Header & Controls */}
       <Navbar
-        activeModule={activeModule}
-        setActiveModule={setActiveModule}
         clockTick={clockTick}
         isRunning={isRunning}
         onTogglePlay={() => setIsRunning((prev) => !prev)}
@@ -334,64 +397,59 @@ export default function App() {
         onOpenReport={() => setIsReportOpen(true)}
       />
 
-      {/* 2. Main Module Workspace */}
+      {/* 2. Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 flex flex-col gap-5">
-        {/* --- MODULE 1: CORE SIMULATOR & PCB LIFECYCLE --- */}
-        {activeModule === 'SIMULATOR' && (
-          <>
-            <LifecycleView
+
+        {/* Main 5-State Lifecycle Diagram */}
+        <LifecycleView
+          processes={processes}
+          selectedPid={selectedPid}
+          onSelectPid={setSelectedPid}
+          algorithm={algorithm}
+        />
+
+        {/* Simple Execution Gantt Chart */}
+        <GanttChart
+          ganttHistory={ganttHistory}
+          currentTick={clockTick}
+        />
+
+        {/* 2-Column Split: Active Process Table + Selected PCB Inspector */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+          {/* Left: Active Processes Table (7 Cols) */}
+          <div className="lg:col-span-7">
+            <ProcessTable
               processes={processes}
               selectedPid={selectedPid}
               onSelectPid={setSelectedPid}
+              onDeleteProcess={handleDeleteProcess}
+              onQuickAddProcess={handleQuickAddProcess}
+              onUpdateProcess={handleUpdateProcess}
+              onBlurProcess={handleBlurProcess}
+              onImportProcesses={handleImportProcesses}
+              onClearAll={handleClearAll}
+              nextPid={nextPid}
               algorithm={algorithm}
             />
+          </div>
 
-            <GanttChart
-              ganttHistory={ganttHistory}
-              currentTick={clockTick}
-            />
+          {/* Right: Focused PCB Inspector (5 Cols) */}
+          <div className="lg:col-span-5">
+            <PCBInspector process={selectedProcess} />
+          </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-              <div className="lg:col-span-7">
-                <ProcessTable
-                  processes={processes}
-                  selectedPid={selectedPid}
-                  onSelectPid={setSelectedPid}
-                  onDeleteProcess={handleDeleteProcess}
-                  onQuickAddProcess={handleQuickAddProcess}
-                  onUpdateProcess={handleUpdateProcess}
-                  onBlurProcess={handleBlurProcess}
-                  onImportProcesses={handleImportProcesses}
-                  onClearAll={handleClearAll}
-                  nextPid={nextPid}
-                  algorithm={algorithm}
-                />
-              </div>
+        </div>
 
-              <div className="lg:col-span-5">
-                <PCBInspector process={selectedProcess} />
-              </div>
-            </div>
+        {/* Bottom: State Transition Event Timeline */}
+        <EventTimeline
+          logs={eventLogs}
+          onClearLogs={() => setEventLogs([])}
+        />
 
-            <EventTimeline
-              logs={eventLogs}
-              onClearLogs={() => setEventLogs([])}
-            />
-          </>
-        )}
-
-        {/* --- MODULE 2: ALGORITHM BATTLE ARENA --- */}
-        {activeModule === 'BATTLE_ARENA' && (
-          <BattleArena defaultProcesses={processes} />
-        )}
-
-        {/* --- MODULE 3: LIVE OS PROCESS MONITOR --- */}
-        {activeModule === 'LIVE_MONITOR' && (
-          <LiveProcessDashboard onImportToSimulator={handleImportProcesses} />
-        )}
       </main>
 
-      {/* Modals for Core Simulator */}
+      {/* New Process Modal */}
       <NewProcessModal
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
@@ -400,6 +458,7 @@ export default function App() {
         currentTick={clockTick}
       />
 
+      {/* Final Performance Evaluation Report Modal */}
       <FinalReportModal
         isOpen={isReportOpen}
         onClose={() => setIsReportOpen(false)}
@@ -407,6 +466,7 @@ export default function App() {
         clockTick={clockTick}
         algorithm={algorithm}
       />
+
     </div>
   );
 }

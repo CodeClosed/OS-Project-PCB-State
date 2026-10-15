@@ -27,7 +27,7 @@ export default function Header({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                Process Lifecycle Dashboard: Visualize PCB State Transition <span className="text-xs font-mono text-cyan-400 border border-cyan-500/30 px-1.5 py-0.5 rounded bg-cyan-500/10">PCB v2.5</span>
+                OS Process Lifecycle <span className="text-xs font-mono text-cyan-400 border border-cyan-500/30 px-1.5 py-0.5 rounded bg-cyan-500/10">PCB v2.5</span>
               </h1>
             </div>
             <p className="text-xs text-slate-400 font-mono">

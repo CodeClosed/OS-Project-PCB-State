@@ -1,11 +1,11 @@
-# 🖥️ Process Lifecycle Dashboard: Visualize PCB State Transition
+# 🖥️ OS Process Lifecycle & CPU Scheduling Simulator
 
 [![Deploy to GitHub Pages](https://github.com/CodeClosed/OS-Project-PCB-State/actions/workflows/deploy.yml/badge.svg)](https://github.com/CodeClosed/OS-Project-PCB-State/actions/workflows/deploy.yml)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-2563eb?style=for-the-badge&logo=github)](https://codeclosed.github.io/OS-Project-PCB-State/)
 
 **Live Website:** 🌐 [https://codeclosed.github.io/OS-Project-PCB-State/](https://codeclosed.github.io/OS-Project-PCB-State/)
 
-An interactive, full-featured **Process Lifecycle Dashboard: Visualize PCB State Transition** built with **React**, **Vite**, and **Tailwind CSS**.
+An interactive, full-featured **Operating System Process Lifecycle & CPU Scheduling Simulator** built with **React**, **Vite**, and **Tailwind CSS**.
 
 Visualize discrete operating system states (5-State Machine), real-time Process Control Block (PCB) tracking, dynamic Execution Gantt Charts, time-travel execution stepping, and comprehensive scheduling performance metrics.
 
@@ -69,8 +69,8 @@ $$\text{Response Time (RT)} = \text{First CPU Start Time} - \text{Arrival Time (
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-username/process-lifecycle-dashboard.git
-   cd process-lifecycle-dashboard
+   git clone https://github.com/your-username/os-process-lifecycle-simulator.git
+   cd os-process-lifecycle-simulator
    ```
 
 2. **Install dependencies:**
