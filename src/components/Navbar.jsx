@@ -27,8 +27,8 @@ export default function Navbar({
             <Cpu className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-sm font-bold text-slate-900 tracking-wide font-sans">
-              OS Process Lifecycle Simulator
+            <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight font-sans">
+              Process Lifecycle Dashboard: Visualize PCB State Transition
             </h1>
             <div className="flex items-center gap-2 text-[11px] text-slate-500">
               <span>Clock: <strong className="text-blue-600 font-bold">T+{clockTick}</strong></span>
