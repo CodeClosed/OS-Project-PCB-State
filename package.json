@@ -1,8 +1,8 @@
 {
-  "name": "os-process-lifecycle-simulator",
+  "name": "process-lifecycle-dashboard-pcb-state-transition",
   "private": true,
   "version": "1.0.0",
-  "description": "Interactive OS 5-State Lifecycle, CPU Scheduling & PCB Simulator with Gantt Charts, CSV Import/Export, and Time-Travel Stepping.",
+  "description": "Process Lifecycle Dashboard: Visualize PCB State Transition - Interactive OS 5-State Lifecycle, CPU Scheduling & PCB Simulator with Gantt Charts, CSV Import/Export, and Time-Travel Stepping.",
   "type": "module",
   "scripts": {
     "dev": "vite",

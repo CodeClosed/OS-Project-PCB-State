@@ -126,7 +126,11 @@ export function createProcess({
   };
 }
 
-export const INITIAL_PROCESSES = [
+// Initial state is completely clear (0 processes loaded)
+export const INITIAL_PROCESSES = [];
+
+// Sample process workload for demo / import
+export const SAMPLE_PROCESSES = [
   createProcess({ pid: 1, name: 'P1', priority: 1, arrivalTime: 0, cpuBurst1: 4, ioDuration: 2, cpuBurst2: 3, memoryMB: 64 }),
   createProcess({ pid: 2, name: 'P2', priority: 2, arrivalTime: 1, cpuBurst1: 3, ioDuration: 0, cpuBurst2: 0, memoryMB: 32 }),
   createProcess({ pid: 3, name: 'P3', priority: 1, arrivalTime: 2, cpuBurst1: 2, ioDuration: 1, cpuBurst2: 2, memoryMB: 48 }),
