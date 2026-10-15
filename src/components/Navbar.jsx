@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, Play, Pause, SkipForward, SkipBack, RotateCcw, Plus, FileText } from 'lucide-react';
+import { Cpu, Play, Pause, SkipForward, SkipBack, RotateCcw, FileText } from 'lucide-react';
 import { SCHEDULERS } from '../types/process';
 
 export default function Navbar({
@@ -117,14 +117,6 @@ export default function Navbar({
             title="Open CT, TAT, WT, RT Performance Report"
           >
             <FileText className="w-3.5 h-3.5" /> Report
-          </button>
-
-          {/* New Process */}
-          <button
-            onClick={onOpenNewModal}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs transition-colors cursor-pointer shrink-0 ml-1"
-          >
-            <Plus className="w-3.5 h-3.5" /> New
           </button>
         </div>
 
